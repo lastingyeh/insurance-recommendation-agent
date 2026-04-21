@@ -17,8 +17,8 @@ def load_prompt() -> str:
 
 toolbox = ToolboxToolset(
     server_url="http://127.0.0.1:5000",
-    protocol=Protocol.MCP,
-    credentials=CredentialStrategy.toolbox_identity(),
+    protocol=Protocol.MCP_LATEST,
+    # credentials=CredentialStrategy.toolbox_identity(),
 )
 
 root_agent = Agent(
