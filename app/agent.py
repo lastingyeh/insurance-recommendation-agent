@@ -30,10 +30,10 @@ def create_agent() -> Agent:
         model="gemini-2.5-flash",
         instruction=load_prompt(),
         tools=[
-            summarize_user_profile,
-            search_products_by_profile,
-            get_product_detail,
-            get_recommendation_rules,
+            # summarize_user_profile,
+            # search_products_by_profile,
+            # get_product_detail,
+            # get_recommendation_rules,
             toolbox,
         ],
     )
@@ -44,8 +44,7 @@ root_agent = create_agent()
 
 def main():
     print(f"{APP_NAME} initialized.")
-    print("Local insurance tools attached.")
-    print("Toolbox toolset attached.")
+    print("ToolboxToolset attached.")
     print("Prompt loaded from file.")
     print(root_agent)
 

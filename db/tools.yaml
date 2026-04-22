@@ -1,0 +1,121 @@
+kind: source
+name: insurance_sqlite
+type: sqlite
+database: /workspace/db/insurance.db
+
+---
+kind: tool
+name: search_products_by_profile
+type: sqlite-sql
+source: insurance_sqlite
+description: "Search candidate insurance products by user age, annual budget, and main protection goal."
+parameters:
+  - name: age
+    type: integer
+    description: User age.
+  - name: budget
+    type: integer
+    description: Annual insurance budget.
+  - name: main_goal
+    type: string
+    description: "Main protection goal. Supported values: medical, accident, life, family_protection, income_protection."
+statement: |
+  SELECT
+      product_id,
+      product_name,
+      product_type,
+      annual_premium_min,
+      annual_premium_max,
+      coverage_focus,
+      coverage_summary,
+      waiting_period_days,
+      exclusions
+  FROM insurance_products
+  WHERE is_active = 1
+    AND $1 BETWEEN target_age_min AND target_age_max
+    AND annual_premium_min <= $2
+    AND product_type IN (
+      CASE
+        WHEN $3 = 'medical' THEN 'medical'
+        WHEN $3 = 'accident' THEN 'accident'
+        WHEN $3 = 'life' THEN 'life'
+        WHEN $3 = 'family_protection' THEN 'life'
+        WHEN $3 = 'income_protection' THEN 'critical_illness'
+      END
+    )
+  ORDER BY annual_premium_min ASC;
+
+---
+kind: tool
+name: get_product_detail
+type: sqlite-sql
+source: insurance_sqlite
+description: Get detailed information for a single insurance product by product_id.
+parameters:
+  - name: product_id
+    type: integer
+    description: Insurance product ID.
+statement: |
+  SELECT
+      product_id,
+      product_name,
+      product_type,
+      target_age_min,
+      target_age_max,
+      annual_premium_min,
+      annual_premium_max,
+      coverage_focus,
+      coverage_summary,
+      waiting_period_days,
+      exclusions,
+      is_active
+  FROM insurance_products
+  WHERE product_id = $1
+    AND is_active = 1;
+
+---
+kind: tool
+name: get_recommendation_rules
+type: sqlite-sql
+source: insurance_sqlite
+description: Get recommendation rules related to the user's main protection goal.
+parameters:
+  - name: main_goal
+    type: string
+    description: Main protection goal.
+statement: |
+  SELECT
+      rule_id,
+      rule_name,
+      product_type,
+      condition_json,
+      recommendation_logic,
+      priority
+  FROM recommendation_rules
+  WHERE is_active = 1
+    AND product_type IN (
+      CASE
+        WHEN $1 = 'medical' THEN 'medical'
+        WHEN $1 = 'accident' THEN 'accident'
+        WHEN $1 = 'life' THEN 'life'
+        WHEN $1 = 'family_protection' THEN 'life'
+        WHEN $1 = 'income_protection' THEN 'critical_illness'
+      END
+    )
+  ORDER BY priority ASC;
+
+---
+kind: toolset
+name: insurance_recommendation_tools
+tools:
+  - search_products_by_profile
+  - get_product_detail
+  - get_recommendation_rules
+
+---
+kind: toolset
+name: insurance_debug_tools
+tools:
+  - search_products_by_profile
+  - get_product_detail
+  - get_recommendation_rules

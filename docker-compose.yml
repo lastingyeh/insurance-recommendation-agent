@@ -8,4 +8,12 @@ services:
       - ./db:/workspace/db
     environment:
       - SQLITE_DATABASE=/workspace/db/insurance.db
-    command: [ "--prebuilt", "sqlite", "-a", "0.0.0.0" ]
+    command:
+      [
+        # "--prebuilt",
+        # "sqlite",
+        "-a",
+        "0.0.0.0",
+        "--config",
+        "/workspace/db/tools.yaml",
+      ]
