@@ -5,10 +5,10 @@ database: /workspace/db/insurance.db
 
 ---
 kind: tool
-name: search_products_by_profile
+name: search_medical_products
 type: sqlite-sql
 source: insurance_sqlite
-description: "Search candidate insurance products by user age, annual budget, and main protection goal."
+description: Search medical insurance products by age and annual budget.
 parameters:
   - name: age
     type: integer
@@ -16,9 +16,6 @@ parameters:
   - name: budget
     type: integer
     description: Annual insurance budget.
-  - name: main_goal
-    type: string
-    description: "Main protection goal. Supported values: medical, accident, life, family_protection, income_protection."
 statement: |
   SELECT
       product_id,
@@ -32,18 +29,105 @@ statement: |
       exclusions
   FROM insurance_products
   WHERE is_active = 1
-    AND $1 BETWEEN target_age_min AND target_age_max
-    AND annual_premium_min <= $2
-    AND product_type IN (
-      CASE
-        WHEN $3 = 'medical' THEN 'medical'
-        WHEN $3 = 'accident' THEN 'accident'
-        WHEN $3 = 'life' THEN 'life'
-        WHEN $3 = 'family_protection' THEN 'life'
-        WHEN $3 = 'income_protection' THEN 'critical_illness'
-      END
-    )
+    AND ? BETWEEN target_age_min AND target_age_max
+    AND annual_premium_min <= ?
+    AND product_type = 'medical'
   ORDER BY annual_premium_min ASC;
+
+---
+kind: tool
+name: search_accident_products
+type: sqlite-sql
+source: insurance_sqlite
+description: Search accident insurance products by age and annual budget.
+parameters:
+  - name: age
+    type: integer
+    description: User age.
+  - name: budget
+    type: integer
+    description: Annual insurance budget.
+statement: |
+  SELECT
+      product_id,
+      product_name,
+      product_type,
+      annual_premium_min,
+      annual_premium_max,
+      coverage_focus,
+      coverage_summary,
+      waiting_period_days,
+      exclusions
+  FROM insurance_products
+  WHERE is_active = 1
+    AND ? BETWEEN target_age_min AND target_age_max
+    AND annual_premium_min <= ?
+    AND product_type = 'accident'
+  ORDER BY annual_premium_min ASC;
+
+---
+kind: tool
+name: search_family_protection_products
+type: sqlite-sql
+source: insurance_sqlite
+description: Search family protection candidates, primarily life insurance, by age and annual budget.
+parameters:
+  - name: age
+    type: integer
+    description: User age.
+  - name: budget
+    type: integer
+    description: Annual insurance budget.
+statement: |
+  SELECT
+      product_id,
+      product_name,
+      product_type,
+      annual_premium_min,
+      annual_premium_max,
+      coverage_focus,
+      coverage_summary,
+      waiting_period_days,
+      exclusions
+  FROM insurance_products
+  WHERE is_active = 1
+    AND ? BETWEEN target_age_min AND target_age_max
+    AND annual_premium_min <= ?
+    AND product_type = 'life'
+  ORDER BY annual_premium_min ASC;
+
+---
+kind: tool
+name: search_income_protection_products
+type: sqlite-sql
+source: insurance_sqlite
+description: Search income protection candidates, prioritizing critical illness products, by age and annual budget.
+parameters:
+  - name: age
+    type: integer
+    description: User age.
+  - name: budget
+    type: integer
+    description: Annual insurance budget.
+statement: |
+  SELECT
+      product_id,
+      product_name,
+      product_type,
+      annual_premium_min,
+      annual_premium_max,
+      coverage_focus,
+      coverage_summary,
+      waiting_period_days,
+      exclusions
+  FROM insurance_products
+  WHERE is_active = 1
+    AND ? BETWEEN target_age_min AND target_age_max
+    AND annual_premium_min <= ?
+    AND product_type IN ('critical_illness', 'life')
+  ORDER BY
+      CASE WHEN product_type = 'critical_illness' THEN 0 ELSE 1 END,
+      annual_premium_min ASC;
 
 ---
 kind: tool
@@ -70,7 +154,7 @@ statement: |
       exclusions,
       is_active
   FROM insurance_products
-  WHERE product_id = $1
+  WHERE product_id = ?
     AND is_active = 1;
 
 ---
@@ -93,14 +177,12 @@ statement: |
       priority
   FROM recommendation_rules
   WHERE is_active = 1
-    AND product_type IN (
-      CASE
-        WHEN $1 = 'medical' THEN 'medical'
-        WHEN $1 = 'accident' THEN 'accident'
-        WHEN $1 = 'life' THEN 'life'
-        WHEN $1 = 'family_protection' THEN 'life'
-        WHEN $1 = 'income_protection' THEN 'critical_illness'
-      END
+    AND (
+      (? = 'medical' AND product_type = 'medical')
+      OR (? = 'accident' AND product_type = 'accident')
+      OR (? = 'life' AND product_type = 'life')
+      OR (? = 'family_protection' AND product_type = 'life')
+      OR (? = 'income_protection' AND product_type IN ('critical_illness', 'life'))
     )
   ORDER BY priority ASC;
 
@@ -108,7 +190,10 @@ statement: |
 kind: toolset
 name: insurance_recommendation_tools
 tools:
-  - search_products_by_profile
+  - search_medical_products
+  - search_accident_products
+  - search_family_protection_products
+  - search_income_protection_products
   - get_product_detail
   - get_recommendation_rules
 
@@ -116,6 +201,60 @@ tools:
 kind: toolset
 name: insurance_debug_tools
 tools:
-  - search_products_by_profile
   - get_product_detail
   - get_recommendation_rules
+
+---
+kind: prompt
+name: insurance_recommendation_response_template
+description: "Template for generating a conservative insurance recommendation response."
+messages:
+  - role: user
+    content: |
+      請根據以下資料生成初步保險推薦回覆。
+
+      使用者條件摘要：
+      {{.user_profile}}
+
+      推薦商品資料：
+      {{.product_candidates}}
+
+      規則依據：
+      {{.recommendation_rules}}
+
+      生成回覆時請遵守以下原則：
+      1. 說明推薦商品名稱
+      2. 說明推薦原因
+      3. 若有條件限制，需清楚提醒
+      4. 若有等待期或除外條款，需簡短說明
+      5. 不可承諾保證核保、保證理賠或保證收益
+      6. 最後一定要加上：
+         本建議僅供初步商品篩選，實際投保仍需以商品條款、健康告知與核保結果為準。
+arguments:
+  - name: user_profile
+    description: "Normalized user profile summary."
+  - name: product_candidates
+    description: "Candidate insurance products from tools."
+  - name: recommendation_rules
+    description: "Recommendation rules returned from tools."
+
+---
+kind: prompt
+name: insurance_followup_question_template
+description: "Template for asking follow-up questions when user information is incomplete."
+messages:
+  - role: user
+    content: |
+      使用者目前提供的資訊如下：
+      {{.known_information}}
+
+      請以保險推薦代理的角色，向使用者追問缺少的必要資訊。
+      必要資訊包括：
+      - 年齡
+      - 預算
+      - 主要保障目標
+
+      請用自然、簡潔、友善的中文發問，不要直接推薦商品。
+arguments:
+  - name: known_information
+    description: "The currently known user information."
