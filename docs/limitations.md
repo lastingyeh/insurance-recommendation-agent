@@ -1,22 +1,310 @@
-# Known Limitations
+# 已知限制（Known Limitations）
 
-1. Demo data only
-Current insurance products and rules are synthetic demo data.
+本文件整理目前這個保險推薦代理原型專案的已知限制，目的不是否定專案成果，而是讓系統邊界更清楚，方便後續：
 
-2. No real underwriting logic
-The agent does not perform actual underwriting checks.
+- 驗收
+- 風險溝通
+- 專案規劃
+- 下一階段擴充
 
-3. Simplified premium logic
-Budget matching is based mainly on annual_premium_min and product ranges.
+本專案目前定位為 **PoC / Prototype**，而非正式上線產品。
 
-4. Limited rule engine
-Recommendation rules are basic and not comprehensive.
+---
 
-5. No production security boundary yet
-The project is still a prototype and has not implemented full production controls.
+## 一、資料層限制
 
-6. No persistent customer profile management
-The system does not yet store long-term user recommendation history.
+### 1. 商品資料為示範資料
+目前 `insurance_products` 中的商品、保費範圍、保障摘要、等待期與除外條款，皆為示範用途資料。
 
-7. No frontend product UI
-Current interaction is through ADK dev UI only.
+因此：
+
+- 不代表真實保險商品
+- 不可直接用於正式銷售
+- 不可視為真實商品建議依據
+
+---
+
+### 2. 推薦規則為原型版本
+目前 `recommendation_rules` 只涵蓋少量場景，例如：
+
+- 年輕低預算
+- 家庭責任
+- 醫療保障
+- 收入中斷保障
+
+這些規則主要用於展示：
+
+- Agent 如何調用規則工具
+- Agent 如何補充推薦依據
+
+但目前尚未涵蓋真實保險規劃所需的完整規則體系。
+
+---
+
+### 3. FAQ 知識庫尚未實際納入主流程
+雖然資料庫中已有 `faq_knowledge` 資料表，但目前主推薦流程仍以商品與規則查詢為主。
+
+目前尚未完成：
+
+- FAQ 語意檢索
+- 條款知識檢索
+- 回答保險觀念問題的完整知識增強流程
+
+---
+
+## 二、推薦邏輯限制
+
+### 4. 尚未實作正式核保邏輯
+目前系統僅做 **初步商品篩選**，並未包含：
+
+- 健康告知判斷
+- 職業等級核保判斷
+- 既往症核保限制
+- 加費、除外承保、延期承保等邏輯
+
+因此，系統不能判定使用者是否一定能投保。
+
+---
+
+### 5. 保費邏輯為簡化版本
+目前工具中的預算條件主要是用來做初步候選商品篩選，例如：
+
+- 年繳預算是否可達商品最低門檻
+- 預算是否落在商品保費區間內
+
+但真實保費通常還會受到更多因素影響，例如：
+
+- 年齡
+- 性別
+- 職業
+- 健康狀況
+- 保額設計
+- 附約搭配
+
+因此，目前保費邏輯僅適合原型驗證，不適合真實報價。
+
+---
+
+### 6. 推薦排序仍為第一版
+目前工具雖已根據場景拆分，例如：
+
+- `search_medical_products`
+- `search_family_protection_products`
+- `search_income_protection_products`
+
+但商品排序仍屬於第一版設計，主要根據：
+
+- 商品類型
+- 預算條件
+- 最低保費排序
+- 少量規則優先順序
+
+未來若商品數量增加，仍需加入更細的排序策略。
+
+---
+
+## 三、Agent 層限制
+
+### 7. 對話記憶仍有限
+目前 Agent 主要針對單輪或短 session 的需求蒐集與推薦。
+
+尚未完整實作：
+
+- 長期使用者偏好記憶
+- 客戶推薦歷史保存
+- 多階段規劃流程記錄
+- 顧問式長對話狀態管理
+
+---
+
+### 8. 追問策略仍為第一版
+目前 Agent 已能在資訊不足時先追問：
+
+- 年齡
+- 預算
+- 保障目標
+
+但尚未做到更完整的訪談式邏輯，例如：
+
+- 婚姻狀態引導
+- 子女狀況引導
+- 既有保單補問
+- 風險偏好深入追問
+- 動態調整追問順序
+
+---
+
+### 9. 回答格式仍偏原型導向
+目前輸出已具備：
+
+- 推薦原因
+- 等待期
+- 除外條款
+- 規則依據
+- 保守聲明
+
+但在真實產品化時，仍可能需要更正式的格式，例如：
+
+- 結構化推薦卡片
+- 比較表
+- 主推薦 / 備選推薦排序區分
+- 更細的條款提示模板
+
+---
+
+## 四、Toolbox 與工具層限制
+
+### 10. 工具仍屬第一版場景拆分
+目前 `tools.yaml` 已成功拆成多個保險工具，但仍是第一版設計。
+
+例如目前只拆到：
+
+- 醫療保障
+- 意外保障
+- 家庭保障
+- 收入中斷保障
+
+未來仍可細化成更多工具，例如：
+
+- 熟齡醫療補強
+- 低預算基礎保障
+- 家庭責任強化
+- 醫療 + 重大疾病組合候選
+- FAQ semantic retrieval tools
+
+---
+
+### 11. prompts 已配置，但尚未完整進入 Agent orchestration
+目前 `tools.yaml` 中已成功加入：
+
+- `insurance_recommendation_response_template`
+- `insurance_followup_question_template`
+
+Toolbox logs 也已成功顯示 prompts 被初始化。
+
+但目前這些 prompts 主要仍屬於配置資產，尚未完整設計成：
+
+- 由 ADK 顯式取得後再納入生成流程
+- 形成完整 prompt orchestration 流程
+
+因此，這部分仍屬可擴充能力，而非目前主流程的核心執行方式。
+
+---
+
+### 12. 尚未加入 embedding / semantic retrieval
+目前系統主要是：
+
+- 結構化商品查詢
+- 結構化規則查詢
+
+尚未加入：
+
+- FAQ 語意檢索
+- 條款語意檢索
+- 商品描述相似度檢索
+- 向量輔助推薦
+
+因此，對於較開放式、概念型、條款型的問題，未來仍建議加入 embedding 模組。
+
+---
+
+## 五、安全與上線限制
+
+### 13. 尚未完成 production 安全設定
+目前 Toolbox logs 仍會出現：
+
+- wildcard origins
+- wildcard hosts
+
+這表示目前配置仍偏向本機開發方便性，尚未加入正式安全限制，例如：
+
+- `--allowed-origins`
+- `--allowed-hosts`
+- 更嚴格的網路邊界控制
+
+---
+
+### 14. 尚未加入正式授權與權限控管
+目前專案仍為原型，尚未完整實作：
+
+- 使用者身份驗證
+- 角色權限管理
+- 工具級存取控制
+- 操作審計與更完整的行為記錄
+
+因此不適合直接暴露給正式外部使用者。
+
+---
+
+### 15. 尚未接正式資料源
+目前資料來源為 SQLite，適合原型與教學。
+
+但正式環境通常還需考慮：
+
+- 正式資料庫
+- 多環境配置
+- 權限分層
+- 資料同步策略
+- 監控與故障處理
+
+---
+
+## 六、產品化限制
+
+### 16. 尚未提供正式前端體驗
+目前使用者互動仍主要依賴：
+
+- ADK Dev UI
+
+這對開發與展示非常方便，但若要產品化，通常仍需要：
+
+- 正式 Web UI
+- 表單式輸入流程
+- 比較型推薦介面
+- 查詢結果卡片式展示
+
+---
+
+### 17. 尚未完成完整測試自動化
+目前已有測試案例與工具驗證，但尚未完整建立：
+
+- 自動化 regression tests
+- 工具輸出驗證腳本
+- 多場景對話測試流程
+- CI/CD 測試整合
+
+---
+
+## 七、限制不代表失敗，而是邊界清楚
+
+這些限制並不代表專案不足，反而表示目前這個 PoC 的邊界清楚：
+
+- 它已能完成受控保險推薦原型
+- 它已能展示 `tools.yaml + ToolboxToolset + MCP Toolbox` 的設計價值
+- 它已能支撐下一階段擴充，例如：
+  - embedding
+  - FAQ retrieval
+  - 正式資料源
+  - 更完整安全控制
+  - 更細的推薦工具
+
+---
+
+## 八、結論
+
+本專案目前是一個 **可運行、可展示、可驗證、可擴充** 的保險推薦代理原型，但尚未達到正式上線條件。
+
+其目前最適合的定位是：
+
+- 教學專案
+- 架構 PoC
+- Agent + Toolbox 整合示範
+- 後續產品化的基礎版本
+
+若要進一步產品化，建議下一階段優先投入：
+
+1. 安全設定
+2. 正式資料源
+3. FAQ / 條款 semantic retrieval
+4. 更完整測試矩陣
+5. 正式前端介面
