@@ -190,6 +190,26 @@ SQLite 作為目前的原型資料層，提供商品、規則與示範資料。
 
 ## 執行方式
 
+### 安裝依賴
+
+一般執行模式：
+
+```bash
+make install
+```
+
+若要執行 ADK evals，請安裝 eval optional dependency group：
+
+```bash
+make install-eval
+```
+
+若已建立 `.venv`，也可改用：
+
+```bash
+make sync-eval
+```
+
 ### 1. 啟用虛擬環境
 
 ```bash

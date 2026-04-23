@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=61.0"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "insurance-recommendation-agent"
@@ -41,3 +41,9 @@ dependencies = [
   "toolbox-adk>=1.0.0",
   "toolbox-core>=1.0.0",
 ]
+
+[project.optional-dependencies]
+eval = ["google-adk[eval]>=1.31.1"]
+
+[tool.setuptools]
+packages = ["app"]

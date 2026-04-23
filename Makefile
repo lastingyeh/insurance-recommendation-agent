@@ -1,5 +1,5 @@
-.PHONY: help install sync db-init db-reset toolbox-up toolbox-down toolbox-logs \
-       run run-web run-cli clean clean-all check env-check
+.PHONY: help install install-eval sync sync-eval db-init db-reset toolbox-up toolbox-down toolbox-logs \
+	run run-web run-cli clean clean-all check env-check
 
 # ─── 預設目標 ──────────────────────────────────────────────
 help: ## 列出所有可用指令
@@ -20,8 +20,15 @@ install: ## 建立虛擬環境並安裝所有依賴
 	$(UV) venv --python 3.12
 	$(UV) sync
 
+install-eval: ## 建立虛擬環境並安裝含 eval extra 的依賴
+	$(UV) venv --python 3.12
+	$(UV) sync --extra eval
+
 sync: ## 同步依賴（已有 .venv 時使用）
 	$(UV) sync
+
+sync-eval: ## 同步含 eval extra 的依賴（執行 evals 時使用）
+	$(UV) sync --extra eval
 
 env-check: ## 檢查必要工具與環境變數
 	@echo "=== 環境檢查 ==="

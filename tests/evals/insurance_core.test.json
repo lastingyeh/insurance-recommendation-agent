@@ -1,0 +1,122 @@
+{
+  "eval_set_id": "insurance_recommendation_core_set",
+  "name": "Insurance recommendation core scenarios",
+  "description": "Core evaluation set for the insurance recommendation agent using MCP Toolbox tools.",
+  "eval_cases": [
+    {
+      "eval_id": "case_1_medical_complete_info",
+      "conversation": [
+        {
+          "invocation_id": "case-1-turn-1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "我 30 歲，年度保險預算 15000，想加強醫療保障，有什麼推薦？"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "應推薦安心住院醫療方案 A，並說明預算符合、醫療保障重點、等待期、除外條款，最後附上保守聲明。"
+              }
+            ],
+            "role": null
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "name": "search_medical_products",
+                "args": {
+                  "age": 30,
+                  "budget": 15000
+                }
+              }
+            ],
+            "intermediate_responses": []
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "app",
+        "user_id": "test_user",
+        "state": {}
+      }
+    },
+    {
+      "eval_id": "case_2_missing_information",
+      "conversation": [
+        {
+          "invocation_id": "case-2-turn-1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "我想買保險，幫我推薦。"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "應先追問年齡、預算與主要保障目標，不應直接推薦商品。"
+              }
+            ],
+            "role": null
+          },
+          "intermediate_data": {
+            "tool_uses": [],
+            "intermediate_responses": []
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "app",
+        "user_id": "test_user",
+        "state": {}
+      }
+    },
+    {
+      "eval_id": "case_3_family_protection",
+      "conversation": [
+        {
+          "invocation_id": "case-3-turn-1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "我 42 歲，已婚有小孩，年度預算 30000，想補家庭保障。"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "應推薦家庭定期壽險方案 C，並說明家庭責任、規則依據、等待期或除外條款，以及保守聲明。"
+              }
+            ],
+            "role": null
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "name": "search_family_protection_products",
+                "args": {
+                  "age": 42,
+                  "budget": 30000
+                }
+              }
+            ],
+            "intermediate_responses": []
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "app",
+        "user_id": "test_user",
+        "state": {}
+      }
+    }
+  ]
+}
