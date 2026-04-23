@@ -1,395 +1,438 @@
 # 保險推薦代理（Insurance Recommendation Agent）
 
-這是一個以 **Google ADK**、**MCP Toolbox for Databases**、**ToolboxToolset**、**tools.yaml**、**SQLite** 與 **Vertex AI** 建立的保險推薦代理原型專案。
+這是一個以 Google ADK、MCP Toolbox for Databases、ToolboxToolset、SQLite 與 Vertex AI 建立的保險推薦代理原型專案。
 
-本專案示範如何透過 **MCP Toolbox 的 YAML 配置方式**，建立可被 Agent 調用的保險專用工具，並完成一個具備互動追問、商品篩選、規則解釋與保守聲明的初步保險推薦流程。
+目前專案的核心設計是：
+
+- 由 ADK Agent 負責對話流程、追問、工具選擇與最終回覆整合
+- 由 MCP Toolbox 載入 db/tools.yaml，提供受控的保險查詢工具與 prompt 模板
+- 由 SQLite 提供示範商品、推薦規則與 FAQ 資料
+- 透過 Makefile 統一管理安裝、資料庫初始化、啟動與 eval 指令
+
+本專案聚焦在「可追溯、可測試、避免自由 SQL」的保險推薦流程，而不是完整投保系統。
 
 ---
 
 ## 專案目標
 
-本專案的目標是建立一個可互動的保險推薦代理，能夠：
+此原型目前的目標是驗證以下能力：
 
 - 在使用者資訊不足時先追問
-- 根據年齡、預算、保障目標篩選商品
-- 透過 MCP Toolbox 提供的保險專用工具查詢資料
-- 說明推薦原因與規則依據
-- 補充等待期、除外條款與限制
-- 提供可追溯的工具呼叫流程
-- 以保守方式輸出初步商品建議
+- 根據年齡、預算與主要保障目標挑選對應工具
+- 透過 MCP Toolbox 執行受控資料查詢
+- 整合推薦原因、規則依據、等待期與除外條款提醒
+- 在回覆中維持保守聲明，不承諾核保、理賠或收益
+- 讓工具呼叫流程能在 ADK trace / eval 中被檢驗
 
 ---
 
-## 最終架構
-
-本專案採用以下架構：
+## 目前架構
 
 ```text
 使用者
 -> Google ADK Agent
 -> ToolboxToolset
 -> MCP Toolbox
--> tools.yaml
+-> db/tools.yaml
 -> SQLite insurance.db
+```
+
+### 元件責任
+
+- Google ADK Agent：負責互動 orchestration，判斷要追問、查哪個工具、何時補查細節與規則
+- ToolboxToolset：作為 ADK 與 MCP Toolbox 間的 MCP 橋接層
+- MCP Toolbox：載入 source、tool、toolset、prompt 定義，對外提供工具服務
+- db/tools.yaml：集中定義資料來源、保險專用工具、工具群組與 prompt 模板
+- SQLite：存放示範商品、推薦規則、demo user profile 與 FAQ
+
+---
+
+## 目前實作狀態
+
+### Agent 執行路徑
+
+目前 app/agent.py 採用以下做法：
+
+- 以 gemini-2.5-flash 作為模型
+- 從 app/prompts/insurance_agent_prompt.txt 載入主代理提示詞
+- 透過 ToolboxToolset 連接 http://127.0.0.1:5000 的 MCP Toolbox
+- 在正式執行路徑中使用 Toolbox 提供的工具，而不是直接把本地 Python helper 註冊成 agent tools
+
+### 本地 Python helper 的角色
+
+app/tools/insurance_tools.py 仍保留一組本地 SQLite helper，主要用途是：
+
+- 提供查詢邏輯的參考實作
+- 供本地測試與資料檢查使用
+- 幫助比對 YAML 工具與 Python 查詢行為
+
+換句話說，執行中的 Agent 目前主要依賴 MCP Toolbox；本地 Python helper 是輔助與測試資產，不是主要 runtime tool surface。
+
+---
+
+## 專案目錄
+
+```text
+insurance-recommendation-agent/
+├── .env
+├── .env.example
+├── Makefile
+├── README.md
+├── app/
+│   ├── __init__.py
+│   ├── agent.py
+│   ├── prompts/
+│   │   └── insurance_agent_prompt.txt
+│   └── tools/
+│       └── insurance_tools.py
+├── data/
+├── db/
+│   ├── insurance.db
+│   ├── schema.sql
+│   ├── seed.sql
+│   └── tools.yaml
+├── docker-compose.yml
+├── docs/
+│   ├── architecture.md
+│   ├── demo_script.md
+│   ├── embedding.md
+│   ├── governance.md
+│   ├── limitations.md
+│   ├── prompt_tool_contract.md
+│   └── summary.md
+├── pyproject.toml
+├── tests/
+│   ├── evals/
+│   │   ├── case_09_system_capability.test.json
+│   │   ├── case_10_no_guarantee.test.json
+│   │   ├── case_11_rule_explanation.test.json
+│   │   ├── case_12_product_detail_follow_up.test.json
+│   │   ├── case_13_no_investment_return.test.json
+│   │   ├── insurance_case12_only.test.json
+│   │   ├── insurance_core.test.json
+│   │   ├── insurance_extended.test.json
+│   │   ├── insurance_safety.test.json
+│   │   └── test_config.json
+│   ├── test_cases.md
+│   ├── test_insurance_tools.py
+│   └── test_result_template.md
+├── uv.lock
+└── insurance_recommendation_agent.egg-info/
 ```
 
 ---
 
 ## 技術組成
 
-* **Google ADK**：負責 Agent 對話流程、追問、工具選擇與最終回答生成
-* **ToolboxToolset**：作為 ADK 與 MCP Toolbox 間的橋接層
-* **MCP Toolbox for Databases**：負責載入 `tools.yaml`，提供保險專用工具與 prompts
-* **tools.yaml**：集中定義 `source`、`tool`、`toolset`、`prompt`
-* **SQLite**：存放保險商品、推薦規則、示範用戶與 FAQ
-* **Vertex AI**：提供模型推理能力
-* **Docker**：啟動 MCP Toolbox Server
+- Google ADK：負責 agent 建立、工具調用與 eval 執行
+- ToolboxToolset：讓 ADK Agent 透過 MCP 協定使用 Toolbox 中的工具
+- MCP Toolbox for Databases：載入 YAML 配置，提供 SQLite 查詢工具與 prompt
+- SQLite：目前的原型資料層
+- Vertex AI：提供 Gemini 模型推理能力
+- Docker Compose：啟動 MCP Toolbox 容器
+- uv：建立虛擬環境與同步 Python 依賴
 
 ---
 
-## 專案目錄結構
+## 已定義的工具與模板
 
-```text
-insurance-recommendation-agent/
-├── Makefile
-├── README.md
-├── app
-│   ├── __init__.py
-│   ├── agent.py
-│   ├── prompts
-│   │   └── insurance_agent_prompt.txt
-│   └── tools
-│       └── insurance_tools.py
-├── data
-├── db
-│   ├── insurance.db
-│   ├── schema.sql
-│   ├── seed.sql
-│   └── tools.yaml
-├── docker-compose.yml
-├── docs
-│   ├── architecture.md
-│   ├── demo_script.md
-│   ├── embedding.md
-│   ├── limitations.md
-│   ├── prompt_tool_contract.md
-│   └── summary.md
-├── pyproject.toml
-├── tests
-│   ├── test_cases.md
-│   └── test_insurance_tools.py
-└── uv.lock
+### Source
+
+- insurance_sqlite
+
+### Tools
+
+- search_medical_products
+- search_accident_products
+- search_family_protection_products
+- search_income_protection_products
+- get_product_by_name
+- get_product_detail
+- get_recommendation_rules
+
+### Toolsets
+
+- insurance_recommendation_tools
+- insurance_debug_tools
+
+### Prompts
+
+- insurance_followup_question_template
+- insurance_recommendation_response_template
+- insurance_disclaimer_template
+
+### 目前工具用途
+
+- search_medical_products：依年齡與年度預算查詢醫療保障商品
+- search_accident_products：依年齡與年度預算查詢意外保障商品
+- search_family_protection_products：依年齡與年度預算查詢家庭保障候選商品
+- search_income_protection_products：依年齡與年度預算查詢收入中斷風險候選商品
+- get_product_by_name：當使用者直接提到商品名稱時，先做精準商品查詢
+- get_product_detail：補查等待期、除外條款、適用年齡與保費範圍等細節
+- get_recommendation_rules：查詢與主要保障目標對應的推薦規則
+
+---
+
+## Agent Prompt 的行為邊界
+
+主提示詞目前定義在 app/prompts/insurance_agent_prompt.txt，核心規則包括：
+
+- 必須先確認是否具備年齡、預算、主要保障目標
+- 若資訊不足，先追問，不可直接推薦
+- 若資訊足夠，依保障目標選擇對應搜尋工具
+- 使用者直接提到商品名稱時，可先使用 get_product_by_name
+- 若需要補充商品限制或條款，再使用 get_product_detail
+- 若需要解釋推薦依據，再使用 get_recommendation_rules
+- 不得承諾保證核保、保證理賠或保證收益
+
+這代表 Agent Prompt 的責任仍是 orchestration，而不是自由資料庫探索。
+
+---
+
+## 資料模型
+
+目前 schema.sql 會建立以下資料表：
+
+- insurance_products：商品主資料
+- recommendation_rules：推薦規則與優先順序
+- user_profiles_demo：示範用使用者資料
+- faq_knowledge：FAQ 知識資料
+
+其中目前推薦流程最直接依賴的是：
+
+- insurance_products
+- recommendation_rules
+
+---
+
+## 安裝與執行
+
+### 前置需求
+
+- Python 3.12
+- uv
+- Docker
+- sqlite3
+- 已可使用 Vertex AI 的 Google Cloud 環境
+
+### 環境變數
+
+請先建立 .env，至少包含 .env.example 中的設定：
+
+```env
+GOOGLE_CLOUD_PROJECT=your-gcp-project
+GOOGLE_CLOUD_LOCATION=your-vertex-region
+GOOGLE_GENAI_USE_VERTEXAI=1
 ```
 
----
+若使用其他認證方式，請自行確保本機可正確存取 Vertex AI。
 
-## 核心設計概念
+### 常用指令
 
-### 1. Google ADK Agent
-
-ADK Agent 負責整體互動流程編排（orchestration），包含：
-
-* 接收使用者需求
-* 判斷是否缺少必要資訊
-* 決定應使用哪一個保險專用工具
-* 視情況補查商品細節或推薦規則
-* 整合工具結果並生成最終回覆
-
-ADK Agent 的責任是「何時問、何時查、如何整合」，而不是直接進行自由資料庫查詢。
-
----
-
-### 2. ToolboxToolset
-
-ToolboxToolset 負責：
-
-* 讓 ADK Agent 透過 MCP 協定連接 MCP Toolbox
-* 將 MCP Toolbox 中定義的工具與 prompts 暴露給 Agent 使用
-* 作為 ADK 與 Toolbox 配置層之間的橋接介面
-
----
-
-### 3. MCP Toolbox
-
-MCP Toolbox 負責：
-
-* 載入 `tools.yaml`
-* 註冊 `source`、`tool`、`toolset`、`prompt`
-* 提供可被 Agent 調用的保險專用工具
-* 提供可重用的 prompt 模板資產
-
-MCP Toolbox 的角色是「受控工具與模板供應層」，不直接負責最終推薦話術編排。
-
----
-
-### 4. tools.yaml
-
-`tools.yaml` 是本專案的配置中心，負責集中管理：
-
-* `source`：資料來源
-* `tool`：保險專用查詢工具
-* `toolset`：工具分組
-* `prompt`：可重用的對話模板
-
-本專案以 `tools.yaml` 作為主要整合核心，而不是讓 Agent 直接自由產生 SQL。
-
----
-
-### 5. SQLite
-
-SQLite 資料庫目前存放：
-
-* `insurance_products`
-* `recommendation_rules`
-* `user_profiles_demo`
-* `faq_knowledge`
-
-SQLite 作為目前的原型資料層，提供商品、規則與示範資料。
-
----
-
-## 目前已定義的保險專用工具
-
-本專案目前透過 `tools.yaml` 定義以下工具：
-
-* `search_medical_products`
-* `search_accident_products`
-* `search_family_protection_products`
-* `search_income_protection_products`
-* `get_product_detail`
-* `get_recommendation_rules`
-
-這些工具的角色如下：
-
-* `search_medical_products`：依年齡與預算查詢醫療保障商品
-* `search_accident_products`：依年齡與預算查詢意外保障商品
-* `search_family_protection_products`：依年齡與預算查詢家庭保障候選商品
-* `search_income_protection_products`：依年齡與預算查詢收入中斷風險保障候選商品
-* `get_product_detail`：查詢單一商品細節，如等待期、除外條款、適用年齡與保費範圍
-* `get_recommendation_rules`：查詢與保障目標相關的推薦規則依據
-
----
-
-## 目前已定義的 Toolbox Prompts
-
-本專案目前在 `tools.yaml` 中定義以下 prompts：
-
-* `insurance_followup_question_template`
-* `insurance_recommendation_response_template`
-* `insurance_disclaimer_template`
-
-這些 prompts 的用途如下：
-
-* `insurance_followup_question_template`：當使用者資訊不足時，用於生成自然、簡潔、友善的追問內容
-* `insurance_recommendation_response_template`：用於整理推薦輸出的基本結構，例如推薦商品名稱、推薦原因、限制與條款提醒
-* `insurance_disclaimer_template`：用於統一附加保守聲明，確保輸出符合原型設計的合規邊界
-
-這些 prompts 屬於「可重用模板資產」，不負責查詢資料，而是協助 Agent 以一致方式組織回覆。
-
----
-
-## 執行方式
-
-### 安裝依賴
-
-一般執行模式：
+首次安裝：
 
 ```bash
 make install
 ```
 
-若要執行 ADK evals，請安裝 eval optional dependency group：
+需要 ADK eval 依賴時：
 
 ```bash
 make install-eval
 ```
 
-若已建立 `.venv`，也可改用：
+已經存在 .venv 時同步依賴：
+
+```bash
+make sync
+```
+
+同步含 eval extra 的依賴：
 
 ```bash
 make sync-eval
 ```
 
-### 1. 啟用虛擬環境
+檢查執行環境：
 
 ```bash
-source .venv/bin/activate
+make env-check
 ```
 
-### 2. 啟動 MCP Toolbox
+初始化資料庫：
+
+```bash
+make db-init
+```
+
+重建資料庫：
+
+```bash
+make db-reset
+```
+
+啟動 Toolbox：
 
 ```bash
 make toolbox-up
 ```
 
-### 3. 啟動 ADK 開發介面
+關閉 Toolbox：
+
+```bash
+make toolbox-down
+```
+
+啟動 ADK Web UI：
 
 ```bash
 make run
 ```
 
-### 4. 開啟瀏覽器
+以 CLI 模式執行 Agent：
 
-前往：
+```bash
+make run-cli
+```
+
+一鍵完成安裝、建庫與啟動 Toolbox：
+
+```bash
+make up
+```
+
+停止服務：
+
+```bash
+make down
+```
+
+啟動後可在瀏覽器開啟：
 
 ```text
 http://127.0.0.1:8000
 ```
 
+### 建議啟動順序
+
+```bash
+make install
+make db-init
+make toolbox-up
+make run
+```
+
 ---
 
-## 測試輸入範例
+## 測試與評估
 
-### 範例一：醫療保障
+### Python 測試
 
-```text
-我 30 歲，年度保險預算 15000，想加強醫療保障，有什麼推薦？
+```bash
+make check
 ```
 
-### 範例二：資訊不足
+目前 tests/test_insurance_tools.py 主要用來驗證本地 SQLite helper 的查詢結果。
 
-```text
-我想買保險，幫我推薦。
+### ADK evals
+
+核心回歸測試：
+
+```bash
+make eval-core
 ```
 
-### 範例三：家庭保障
+Safety 單案例測試：
 
-```text
-我 42 歲，已婚有小孩，年度預算 30000，想補家庭保障。
+```bash
+make eval-safety
 ```
 
-### 範例四：收入中斷保障
+或分別執行：
 
-```text
-我 38 歲，已婚有小孩，年度預算 25000，想加強收入中斷風險保障。
+```bash
+make eval-safety-case-09
+make eval-safety-case-10
+make eval-safety-case-11
+make eval-safety-case-12
+make eval-safety-case-13
 ```
+
+### Eval 檔案配置
+
+目前主要 eval 檔案位於 tests/evals：
+
+- insurance_core.test.json
+- insurance_extended.test.json
+- case_09_system_capability.test.json
+- case_10_no_guarantee.test.json
+- case_11_rule_explanation.test.json
+- case_12_product_detail_follow_up.test.json
+- case_13_no_investment_return.test.json
+- insurance_safety.test.json
+- insurance_case12_only.test.json
+- test_config.json
+
+目前 test_config.json 的評估標準為：
+
+- tool_trajectory_avg_score：threshold 1.0，match_type 為 IN_ORDER
+- final_response_match_v2：threshold 0.7
+
+---
+
+## 推薦流程摘要
+
+1. 使用者輸入需求
+2. Agent 判斷是否已有年齡、預算、主要保障目標
+3. 若資訊不足，先追問
+4. 若資訊足夠，選擇對應的 MCP Toolbox 工具
+5. 必要時補查推薦規則與商品細節
+6. 整合候選商品、條款提醒與保守聲明，生成最終回覆
 
 ---
 
 ## 目前能力
 
-本專案目前已可做到：
-
-* 在資訊不足時先追問
-* 根據保障目標選擇對應 YAML 工具
-* 依年齡、預算與需求篩選保險商品
-* 透過推薦規則補充解釋依據
-* 補充等待期與除外條款
-* 使用 Toolbox prompts 提升追問與推薦輸出的一致性
-* 於 ADK trace 中看到可追溯的工具呼叫流程
-* 避免使用自由 SQL 作為主要推薦方式
-* 透過 `tools.yaml + ToolboxToolset` 完成完整整合設計
-
----
-
-## Prompt 與 Tool 的分工原則
-
-本專案採用以下分工原則：
-
-### 1. Agent Prompt 負責行為編排
-
-`app/prompts/insurance_agent_prompt.txt` 主要負責：
-
-* 判斷是否需要追問
-* 判斷應選擇哪一個保險專用工具
-* 決定何時補查商品細節或規則依據
-* 規範整體互動流程與禁止事項
-
-也就是說，Agent Prompt 負責「行為 orchestration」，而不是直接提供資料。
-
----
-
-### 2. Toolbox Prompts 負責可重用話術模板
-
-`tools.yaml` 中定義的 prompts 主要負責：
-
-* 缺少資訊時的追問模板
-* 推薦結果的輸出模板
-* 最後的保守聲明模板
-
-這些 prompts 屬於「可重用語言模板」，用來提升不同場景下的輸出一致性。
-
----
-
-### 3. Toolbox Tools 負責受控資料存取
-
-`tools.yaml` 中定義的 tools 主要負責：
-
-* 提供受控且可測試的資料查詢能力
-* 回傳商品候選清單
-* 回傳商品細節
-* 回傳推薦規則依據
-
-Tools 的責任是「查資料、回資料」，不是決定最終推薦話術。
-
----
-
-### 4. 分工邊界
-
-本專案遵守以下邊界：
-
-* **Agent 不應自由產生任意 SQL**
-* **Toolbox Tools 不負責最終推薦文案編排**
-* **Toolbox Prompts 不負責資料查詢**
-* **Agent 負責解釋與整合，Toolbox 負責受控存取與模板資產**
-
-這樣的設計可讓 Agent 行為、工具能力與模板資產清楚分離，提升可維護性與可測試性。
-
----
-
-## 推薦流程中的責任分配
-
-在一次完整推薦流程中，各層責任如下：
-
-1. **Agent**
-
-   * 判斷使用者資訊是否足夠
-   * 若不足，觸發追問邏輯
-   * 若足夠，選擇對應的保險專用工具
-
-2. **Toolbox Tools**
-
-   * 根據年齡、預算、保障目標查詢候選商品
-   * 回傳商品細節與推薦規則依據
-
-3. **Toolbox Prompts**
-
-   * 協助 Agent 以一致格式提出追問
-   * 協助 Agent 以一致格式整理推薦內容與聲明
-
-4. **Agent**
-
-   * 根據工具結果與模板資產整合成最終回覆
-   * 確保輸出保守、可追溯、不可虛構
+- 可在資訊不足時先追問核心欄位
+- 可依保障目標切換對應保險工具
+- 可查詢商品候選、商品細節與推薦規則
+- 可處理使用者直接提及商品名稱的細節追問
+- 可在回覆中補充等待期與除外條款提醒
+- 可透過 ADK eval 驗證工具使用順序與最終回答品質
 
 ---
 
 ## 已知限制
 
-目前專案仍有以下限制：
+目前仍有以下限制：
 
-1. 商品資料為示範用途，非真實保險商品
-2. 尚未實作正式核保流程
-3. 保費邏輯仍為簡化版本
-4. 推薦規則涵蓋範圍有限
-5. 尚未加入 production 級安全限制
-6. 尚未加入 embedding / semantic retrieval 功能
-7. 目前互動介面仍以 ADK Dev UI 為主
+1. 商品資料為示範用途，非真實保險商品。
+2. 尚未實作正式核保流程。
+3. 保費邏輯仍屬簡化版本。
+4. 推薦規則覆蓋範圍有限。
+5. FAQ/embedding 檢索尚未接入正式推薦流程。
+6. 本地 Python helper 與 YAML 工具存在雙軌實作，後續仍可再收斂。
+7. 目前 UI 以 ADK Web UI 為主，尚未提供獨立前端。
 
 ---
 
-## 後續可擴充方向
+## 後續建議方向
 
-建議後續可依序擴充：
+1. 將 agent prompt 中已使用的 get_product_by_name 完整反映到更多設計文件與測試案例。
+2. 補強 FAQ、條款與除外責任的 retrieval 能力。
+3. 讓本地 Python helper 與 MCP YAML 工具的能力邊界更一致。
+4. 擴充 eval matrix，覆蓋更多追問、多輪澄清與商品比較情境。
+5. 規劃正式前端與更完整的安全/治理設定。
 
-1. 補強 `tools.yaml` 的場景工具與 toolsets 分工
-2. 擴充 Toolbox prompts，建立更多標準化輸出模板
-3. 加入 FAQ 語意檢索
-4. 加入條款與除外責任檢索
-5. 補強 `allowed-origins` 與 `allowed-hosts`
-6. 擴充測試矩陣與驗收案例
-7. 切換到正式資料源
-8. 增加前端互動介面
+---
+
+## 相關文件
+
+- docs/architecture.md：系統架構與資料流
+- docs/prompt_tool_contract.md：Prompt 與 Tool 的分工邊界
+- docs/governance.md：治理與限制說明
+- docs/limitations.md：限制與後續方向
+- docs/demo_script.md：示範對話腳本
 
 ---
 

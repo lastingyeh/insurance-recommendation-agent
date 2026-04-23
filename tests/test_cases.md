@@ -356,3 +356,15 @@
 - Output Summary
 - Pass / Fail
 - Notes
+
+## ADK Eval Mapping
+
+### Extended Set
+- Case 4 -> search_accident_products
+- Case 5 -> search_income_protection_products
+- Case 6 -> search_medical_products
+
+### Evaluation Strategy
+- tool_trajectory_avg_score: validate minimum necessary tool path
+- final_response_match_v2: validate semantic correctness of final answer
+- optional enrichment tools should not be mandatory in baseline

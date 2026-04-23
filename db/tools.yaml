@@ -162,11 +162,11 @@ kind: tool
 name: get_recommendation_rules
 type: sqlite-sql
 source: insurance_sqlite
-description: Get recommendation rules related to the user's main protection goal.
+description: Get recommendation rules by product type.
 parameters:
-  - name: main_goal
+  - name: product_type
     type: string
-    description: Main protection goal.
+    description: Product type. One of medical, accident, life, critical_illness.
 statement: |
   SELECT
       rule_id,
@@ -177,14 +177,33 @@ statement: |
       priority
   FROM recommendation_rules
   WHERE is_active = 1
-    AND (
-      (? = 'medical' AND product_type = 'medical')
-      OR (? = 'accident' AND product_type = 'accident')
-      OR (? = 'life' AND product_type = 'life')
-      OR (? = 'family_protection' AND product_type = 'life')
-      OR (? = 'income_protection' AND product_type IN ('critical_illness', 'life'))
-    )
+    AND product_type = ?
   ORDER BY priority ASC;
+
+---
+kind: tool
+name: get_product_by_name
+type: sqlite-sql
+source: insurance_sqlite
+description: Get insurance product basic information by exact product name.
+parameters:
+  - name: product_name
+    type: string
+    description: Exact insurance product name.
+statement: |
+  SELECT
+      product_id,
+      product_name,
+      product_type,
+      annual_premium_min,
+      annual_premium_max,
+      coverage_focus,
+      coverage_summary,
+      waiting_period_days,
+      exclusions
+  FROM insurance_products
+  WHERE is_active = 1
+    AND product_name = ?;
 
 ---
 kind: toolset
@@ -194,6 +213,7 @@ tools:
   - search_accident_products
   - search_family_protection_products
   - search_income_protection_products
+  - get_product_by_name
   - get_product_detail
   - get_recommendation_rules
 
@@ -201,6 +221,7 @@ tools:
 kind: toolset
 name: insurance_debug_tools
 tools:
+  - get_product_by_name
   - get_product_detail
   - get_recommendation_rules
 

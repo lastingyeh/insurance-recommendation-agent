@@ -1,0 +1,47 @@
+{
+  "eval_set_id": "insurance_case12_only_set",
+  "name": "Insurance case 12 only",
+  "description": "Single-case evaluation for product detail follow-up.",
+  "eval_cases": [
+    {
+      "eval_id": "case_12_product_detail_follow_up",
+      "conversation": [
+        {
+          "invocation_id": "case-12-turn-1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "你剛剛推薦的家庭定期壽險方案 C，有沒有等待期或特別除外條款？"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "應回答家庭定期壽險方案 C 的等待期與除外條款，聚焦商品細節，不需重新做完整推薦，也不應虛構額外條款。"
+              }
+            ],
+            "role": null
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "name": "get_product_by_name",
+                "args": {
+                  "product_name": "家庭定期壽險方案 C"
+                }
+              }
+            ],
+            "intermediate_responses": []
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "app",
+        "user_id": "test_user",
+        "state": {}
+      }
+    }
+  ]
+}

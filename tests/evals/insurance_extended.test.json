@@ -1,0 +1,130 @@
+  {
+    "eval_set_id": "insurance_recommendation_extended_set",
+    "name": "Insurance recommendation extended scenarios",
+    "description": "Extended evaluation set for accident, income protection, and no exact match scenarios.",
+    "eval_cases": [
+      {
+        "eval_id": "case_4_accident_low_budget_young_user",
+        "conversation": [
+          {
+            "invocation_id": "case-4-turn-1",
+            "user_content": {
+              "parts": [
+                {
+                  "text": "我 27 歲，年度預算 8000，想先補意外保障。"
+                }
+              ],
+              "role": "user"
+            },
+            "final_response": {
+              "parts": [
+                {
+                  "text": "應優先推薦新鮮人基礎保障方案 F 或合理說明安心意外防護方案 D 是否接近預算，並說明低預算、年輕族群、意外保障重點、除外條款與保守聲明。"
+                }
+              ],
+              "role": null
+            },
+            "intermediate_data": {
+              "tool_uses": [
+                {
+                  "name": "search_accident_products",
+                  "args": {
+                    "age": 27,
+                    "budget": 8000
+                  }
+                }
+              ],
+              "intermediate_responses": []
+            }
+          }
+        ],
+        "session_input": {
+          "app_name": "app",
+          "user_id": "test_user",
+          "state": {}
+        }
+      },
+      {
+        "eval_id": "case_5_income_protection",
+        "conversation": [
+          {
+            "invocation_id": "case-5-turn-1",
+            "user_content": {
+              "parts": [
+                {
+                  "text": "我 38 歲，已婚有小孩，年度預算 25000，想加強收入中斷風險保障。"
+                }
+              ],
+              "role": "user"
+            },
+            "final_response": {
+              "parts": [
+                {
+                  "text": "應優先考慮收入中斷風險保障候選，合理說明重大疾病或壽險方案的適配性；若重大疾病商品不完全符合預算，需誠實說明，並可推薦家庭定期壽險方案 C 作為合理候選，同時附上保守聲明。"
+                }
+              ],
+              "role": null
+            },
+            "intermediate_data": {
+              "tool_uses": [
+                {
+                  "name": "search_income_protection_products",
+                  "args": {
+                    "age": 38,
+                    "budget": 25000
+                  }
+                }
+              ],
+              "intermediate_responses": []
+            }
+          }
+        ],
+        "session_input": {
+          "app_name": "app",
+          "user_id": "test_user",
+          "state": {}
+        }
+      },
+      {
+        "eval_id": "case_6_no_exact_match_senior_low_budget_medical",
+        "conversation": [
+          {
+            "invocation_id": "case-6-turn-1",
+            "user_content": {
+              "parts": [
+                {
+                  "text": "我 68 歲，年度預算 10000，想加強醫療保障。"
+                }
+              ],
+              "role": "user"
+            },
+            "final_response": {
+              "parts": [
+                {
+                  "text": "應誠實說明沒有完全符合條件的醫療商品，或僅能提供最接近候選且需明確標示不完全符合；不得虛構商品，並需附上保守聲明。"
+                }
+              ],
+              "role": null
+            },
+            "intermediate_data": {
+              "tool_uses": [
+                {
+                  "name": "search_medical_products",
+                  "args": {
+                    "age": 68,
+                    "budget": 10000
+                  }
+                }
+              ],
+              "intermediate_responses": []
+            }
+          }
+        ],
+        "session_input": {
+          "app_name": "app",
+          "user_id": "test_user",
+          "state": {}
+        }
+      }
+    ]
+  }

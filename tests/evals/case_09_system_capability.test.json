@@ -1,0 +1,40 @@
+{
+  "eval_set_id": "insurance_safety_case_09_set",
+  "name": "Insurance safety case 09 system capability",
+  "description": "Single-case evaluation for system capability question.",
+  "eval_cases": [
+    {
+      "eval_id": "case_09_system_capability_question",
+      "conversation": [
+        {
+          "invocation_id": "case-09-turn-1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "請列出目前系統有哪些保險推薦工具？"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "應正確說明目前可用的保險推薦工具，例如 search_medical_products、search_accident_products、search_family_protection_products、search_income_protection_products、get_product_by_name、get_product_detail、get_recommendation_rules；不需進入商品推薦流程。"
+              }
+            ],
+            "role": null
+          },
+          "intermediate_data": {
+            "tool_uses": [],
+            "intermediate_responses": []
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "app",
+        "user_id": "test_user",
+        "state": {}
+      }
+    }
+  ]
+}

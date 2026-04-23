@@ -1,5 +1,6 @@
 .PHONY: help install install-eval sync sync-eval db-init db-reset toolbox-up toolbox-down toolbox-logs \
-	run run-web run-cli clean clean-all check env-check
+	run run-web run-cli clean clean-all check env-check eval-core eval-safety \
+	eval-safety-case-09 eval-safety-case-10 eval-safety-case-11 eval-safety-case-12 eval-safety-case-13
 
 # ─── 預設目標 ──────────────────────────────────────────────
 help: ## 列出所有可用指令
@@ -14,6 +15,8 @@ DB_FILE  := db/insurance.db
 ADK      := .venv/bin/adk
 APP_DIR  := .
 ADK_PORT := 8000
+EVAL_DIR := tests/evals
+EVAL_CONFIG := $(EVAL_DIR)/test_config.json
 
 # ─── 環境建立 ──────────────────────────────────────────────
 install: ## 建立虛擬環境並安裝所有依賴
@@ -81,6 +84,33 @@ _kill-port: ## (內部) 釋放 ADK_PORT 佔用的程序
 # ─── 測試 ──────────────────────────────────────────────────
 check: ## 執行測試
 	$(PYTHON) -m pytest tests/ -v
+
+# ─── ADK Evals ───────────────────────────────────────────
+eval-core: ## 執行核心回歸 eval
+	$(ADK) eval app $(EVAL_DIR)/insurance_core.test.json --config_file_path $(EVAL_CONFIG)
+	$(ADK) eval app $(EVAL_DIR)/insurance_extended.test.json --config_file_path $(EVAL_CONFIG)
+
+eval-safety: ## 執行所有 safety 單案 eval
+	$(MAKE) eval-safety-case-09
+	$(MAKE) eval-safety-case-10
+	$(MAKE) eval-safety-case-11
+	$(MAKE) eval-safety-case-12
+	$(MAKE) eval-safety-case-13
+
+eval-safety-case-09: ## 執行 safety case 09 eval
+	$(ADK) eval app $(EVAL_DIR)/case_09_system_capability.test.json --config_file_path $(EVAL_CONFIG)
+
+eval-safety-case-10: ## 執行 safety case 10 eval
+	$(ADK) eval app $(EVAL_DIR)/case_10_no_guarantee.test.json --config_file_path $(EVAL_CONFIG)
+
+eval-safety-case-11: ## 執行 safety case 11 eval
+	$(ADK) eval app $(EVAL_DIR)/case_11_rule_explanation.test.json --config_file_path $(EVAL_CONFIG)
+
+eval-safety-case-12: ## 執行 safety case 12 eval
+	$(ADK) eval app $(EVAL_DIR)/case_12_product_detail_follow_up.test.json --config_file_path $(EVAL_CONFIG)
+
+eval-safety-case-13: ## 執行 safety case 13 eval
+	$(ADK) eval app $(EVAL_DIR)/case_13_no_investment_return.test.json --config_file_path $(EVAL_CONFIG)
 
 # ─── 清除 ──────────────────────────────────────────────────
 clean: ## 清除快取與暫存檔
