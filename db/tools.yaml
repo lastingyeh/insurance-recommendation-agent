@@ -206,8 +206,32 @@ tools:
 
 ---
 kind: prompt
+name: insurance_followup_question_template
+description: "Template for asking follow-up questions when required user information is incomplete."
+messages:
+  - role: user
+    content: |
+      使用者目前已提供的資訊如下：
+      {{.known_information}}
+
+      請以保險推薦代理的角色，向使用者追問缺少的核心必要資訊。
+      核心必要資訊包括：
+      - 年齡
+      - 預算
+      - 主要保障目標
+
+      請遵守以下原則：
+      1. 用自然、簡潔、友善的中文發問
+      2. 不要直接推薦商品
+      3. 不要加入未經查詢的商品資訊
+arguments:
+  - name: known_information
+    description: "Currently known user information."
+
+---
+kind: prompt
 name: insurance_recommendation_response_template
-description: "Template for generating a conservative insurance recommendation response."
+description: "Template for generating a structured insurance recommendation response from tool results."
 messages:
   - role: user
     content: |
@@ -222,39 +246,29 @@ messages:
       規則依據：
       {{.recommendation_rules}}
 
-      生成回覆時請遵守以下原則：
-      1. 說明推薦商品名稱
-      2. 說明推薦原因
+      請用繁體中文輸出，並遵守以下格式原則：
+      1. 先說明推薦商品名稱
+      2. 再說明推薦原因
       3. 若有條件限制，需清楚提醒
       4. 若有等待期或除外條款，需簡短說明
-      5. 不可承諾保證核保、保證理賠或保證收益
-      6. 最後一定要加上：
-         本建議僅供初步商品篩選，實際投保仍需以商品條款、健康告知與核保結果為準。
+      5. 若沒有完全符合條件的商品，需誠實說明並提供最接近候選方案
+      6. 不可承諾保證核保、保證理賠或保證收益
+      7. 不可虛構工具結果中不存在的資訊
 arguments:
   - name: user_profile
     description: "Normalized user profile summary."
   - name: product_candidates
-    description: "Candidate insurance products from tools."
+    description: "Candidate insurance products returned by tools."
   - name: recommendation_rules
-    description: "Recommendation rules returned from tools."
+    description: "Recommendation rules returned by tools."
 
 ---
 kind: prompt
-name: insurance_followup_question_template
-description: "Template for asking follow-up questions when user information is incomplete."
+name: insurance_disclaimer_template
+description: "Standard disclaimer for insurance recommendation responses."
 messages:
   - role: user
     content: |
-      使用者目前提供的資訊如下：
-      {{.known_information}}
+      請在回覆最後附上以下保守聲明，保持原意，不可省略：
 
-      請以保險推薦代理的角色，向使用者追問缺少的必要資訊。
-      必要資訊包括：
-      - 年齡
-      - 預算
-      - 主要保障目標
-
-      請用自然、簡潔、友善的中文發問，不要直接推薦商品。
-arguments:
-  - name: known_information
-    description: "The currently known user information."
+      本建議僅供初步商品篩選，實際投保仍需以商品條款、健康告知與核保結果為準。
