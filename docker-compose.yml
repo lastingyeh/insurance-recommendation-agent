@@ -3,7 +3,7 @@ services:
     image: us-central1-docker.pkg.dev/database-toolbox/toolbox/toolbox:1.1.0
     container_name: insurance-toolbox
     ports:
-      - "5000:5000"
+      - "${TOOLBOX_PORT:-5000}:5000"
     volumes:
       - ./db:/workspace/db
     environment:
@@ -11,7 +11,7 @@ services:
     command:
       [
         # "--prebuilt",
-        # "sqlite",
+      # "sqlite",
         "-a",
         "0.0.0.0",
         "--config",

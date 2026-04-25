@@ -10,6 +10,7 @@ class AppRuntimeConfig:
     toolbox_server_url: str
     session_db_uri: str
     memory_mode: str
+    model_name: str
 
 
 def load_runtime_config() -> AppRuntimeConfig:
@@ -21,4 +22,5 @@ def load_runtime_config() -> AppRuntimeConfig:
             "sqlite+aiosqlite:///./db/adk_sessions.db",
         ),
         memory_mode=os.getenv("ADK_MEMORY_MODE", "in_memory"),
+        model_name=os.getenv("MODEL_NAME", "gemini-3-flash-preview"),
     )

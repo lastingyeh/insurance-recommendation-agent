@@ -30,7 +30,7 @@ def create_agent():
 
     agent = Agent(
         name=APP_CONFIG.app_name,
-        model="gemini-2.5-flash",
+        model=APP_CONFIG.model_name,
         instruction=load_prompt(),
         tools=[
             get_user_profile_snapshot,
