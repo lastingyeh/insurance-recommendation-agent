@@ -3,13 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 
 const getBaseUrl = () =>
-  process.env.ADK_API_BASE_URL ?? 'http://127.0.0.1:8000';
-const getAppName = () => process.env.ADK_API_APP_NAME ?? 'app';
-const getUserId = () => process.env.ADK_API_USER_ID ?? 'demo-user';
-
-function buildUrl(base: string, path: string) {
-  return new URL(path, `${base.replace(/\/$/, '')}/`).toString();
-}
+  process.env.FASTAPI_BASE_URL ?? 'http://127.0.0.1:8080';
 
 export async function DELETE(
   _: NextRequest,
@@ -26,11 +20,9 @@ export async function DELETE(
     }
 
     const baseUrl = getBaseUrl();
-    const appName = getAppName();
-    const userId = getUserId();
-    const sessionPath = `/apps/${encodeURIComponent(appName)}/users/${encodeURIComponent(userId)}/sessions/${encodeURIComponent(sessionId)}`;
+    const upstreamUrl = `${baseUrl.replace(/\/$/, '')}/api/agent/sessions/${encodeURIComponent(sessionId)}`;
 
-    const response = await fetch(buildUrl(baseUrl, sessionPath), {
+    const response = await fetch(upstreamUrl, {
       method: 'DELETE',
       headers: { Accept: 'application/json' },
     });
@@ -44,6 +36,9 @@ export async function DELETE(
       { status: 502 },
     );
   } catch {
-    return NextResponse.json({ error: 'ADK unavailable' }, { status: 502 });
+    return NextResponse.json(
+      { error: 'FastAPI backend unavailable' },
+      { status: 502 },
+    );
   }
 }

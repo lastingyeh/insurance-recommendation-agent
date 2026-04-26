@@ -353,15 +353,21 @@ make down
 http://127.0.0.1:8000
 ```
 
-### 建議啟動順序
+### 建議啟動順序（FastAPI 後端）
 
 ```bash
 make install
 make db-init
 make toolbox-up
-make run-api
-make ui-dev
+make run-fastapi   # 啟動 FastAPI backend（port 8080）
+make ui-dev        # 啟動 Next.js 前端（port 3000）
 ```
+
+前端透過 `frontend/.env.local` 的 `FASTAPI_BASE_URL` 指向 FastAPI backend，預設為 `http://127.0.0.1:8080`。Next.js route handler 只做輕量 proxy，不再直接依賴 ADK API server 或 `/run_sse`。
+
+資料流：前端 → Next.js API routes → FastAPI → ADK Runner → Toolbox MCP → SQLite
+
+> 若需要使用 ADK Web UI 開發模式，可改執行 `make run`（port 8000）。
 
 ---
 
