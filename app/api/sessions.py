@@ -5,20 +5,19 @@ from fastapi.responses import JSONResponse
 
 from app.api.dependencies import get_container
 from app.api.schemas import SessionCreateRequest
-from app.application.session_facade import SessionFacade
+from app.services.session_service import SessionService
 
 router = APIRouter(prefix="/api/agent/sessions", tags=["sessions"])
 
 
-def _get_session_facade(request: Request) -> SessionFacade:
-    container = get_container(request)
-    return SessionFacade(container.session_service, container.config)
+def _get_session_service(request: Request) -> SessionService:
+    return get_container(request).sessions
 
 
 @router.get("")
 async def list_sessions(request: Request):
     try:
-        sessions = await _get_session_facade(request).list_sessions()
+        sessions = await _get_session_service(request).list_sessions()
         return {"sessions": sessions}
     except Exception as exc:
         return JSONResponse(
@@ -37,7 +36,7 @@ async def create_session(payload: SessionCreateRequest, request: Request):
         )
 
     try:
-        await _get_session_facade(request).ensure_session(session_id, payload.state)
+        await _get_session_service(request).ensure_session(session_id, payload.state)
         return {"ok": True}
     except Exception as exc:
         return JSONResponse(
@@ -56,7 +55,7 @@ async def delete_session(session_id: str, request: Request):
         )
 
     try:
-        await _get_session_facade(request).delete_session(normalized_session_id)
+        await _get_session_service(request).delete_session(normalized_session_id)
         return {"ok": True}
     except Exception as exc:
         return JSONResponse(

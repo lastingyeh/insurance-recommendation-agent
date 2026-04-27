@@ -4,7 +4,7 @@ from typing import Any
 
 from google.adk.tools.tool_context import ToolContext
 
-from app.domain.session_state import (
+from app.session_state import (
     LAST_RECOMMENDATION_STATE_KEYS,
     TRACKED_PROFILE_STATE_KEYS,
 )

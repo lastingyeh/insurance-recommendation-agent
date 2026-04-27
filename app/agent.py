@@ -6,7 +6,7 @@ from google.adk.tools.toolbox_toolset import ToolboxToolset
 from toolbox_core.protocol import Protocol
 
 
-from app.core.config import AppRuntimeConfig, load_runtime_config
+from app.config import AppRuntimeConfig, load_runtime_config
 from app.tools.session_tools import (
     clear_last_recommendation,
     get_user_profile_snapshot,

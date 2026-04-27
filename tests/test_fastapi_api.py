@@ -94,7 +94,7 @@ def test_session_crud_round_trip(monkeypatch, tmp_path):
 
 def test_run_stream_returns_sse_envelopes(monkeypatch, tmp_path):
     client = create_test_client(monkeypatch, tmp_path)
-    run_module = import_module("app.api.routes.run")
+    run_module = import_module("app.api.run")
 
     class FakeRunner:
         async def run_async(
@@ -199,7 +199,7 @@ def test_run_stream_returns_sse_envelopes(monkeypatch, tmp_path):
 
 def test_run_stream_returns_error_envelope_when_runner_fails(monkeypatch, tmp_path):
     client = create_test_client(monkeypatch, tmp_path)
-    run_module = import_module("app.api.routes.run")
+    run_module = import_module("app.api.run")
 
     class FailingRunner:
         async def run_async(

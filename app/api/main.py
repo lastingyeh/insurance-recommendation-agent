@@ -7,10 +7,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.dependencies import get_container
-from app.api.routes.run import router as run_router
-from app.api.routes.sessions import router as session_router
-from app.application.health import ReadinessService
-from app.core.container import AppContainer, build_app_container
+from app.api.run import router as run_router
+from app.api.sessions import router as session_router
+from app.container import AppContainer, build_app_container
 
 
 def create_app(container: AppContainer | None = None) -> FastAPI:
@@ -45,7 +44,7 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
     @app.get("/readyz")
     async def readyz(request: Request):
         container = get_container(request)
-        errors = await ReadinessService(container).collect_errors()
+        errors = await container.readiness.collect_errors()
 
         if errors:
             return JSONResponse(

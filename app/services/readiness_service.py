@@ -4,25 +4,32 @@ import asyncio
 
 import requests
 
-from app.core.container import AppContainer
+from google.adk.sessions.base_session_service import BaseSessionService
+
+from app.config import AppRuntimeConfig
 
 
 class ReadinessService:
-    def __init__(self, container: AppContainer) -> None:
-        self._container = container
+    def __init__(
+        self,
+        session_store: BaseSessionService,
+        config: AppRuntimeConfig,
+    ) -> None:
+        self._session_store = session_store
+        self._config = config
 
     async def collect_errors(self) -> list[str]:
         errors: list[str] = []
 
         try:
-            self._container.session_service
+            self._session_store
         except Exception as exc:
             errors.append(f"session_service: {exc}")
 
         try:
             await asyncio.to_thread(
                 requests.get,
-                self._container.config.toolbox_server_url,
+                self._config.toolbox_server_url,
                 timeout=1,
             )
         except requests.RequestException as exc:
