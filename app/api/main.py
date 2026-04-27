@@ -7,8 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.dependencies import get_container
-from app.api.run import router as run_router
-from app.api.sessions import router as session_router
+from app.api.routes import run_router, session_router
 from app.container import AppContainer, build_app_container
 
 

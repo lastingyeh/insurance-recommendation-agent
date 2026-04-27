@@ -73,6 +73,19 @@ function removeSessionHistory(sessionId: string) {
   }
 }
 
+function getOrCreateUserId(): string {
+  const key = 'ins-agent:userId';
+  try {
+    const stored = localStorage.getItem(key);
+    if (stored) return stored;
+    const id = `user-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    localStorage.setItem(key, id);
+    return id;
+  } catch {
+    return 'anonymous';
+  }
+}
+
 type ChatItem =
   | { kind: 'message'; message: ChatMessage }
   | { kind: 'tool-event'; event: TimelineEvent };
@@ -130,6 +143,12 @@ export function AdkWorkbench() {
   const [sidebarW, setSidebarW] = useState(240);
   const [inspectorW, setInspectorW] = useState(320);
 
+  const [userId, setUserId] = useState('anonymous');
+
+  useEffect(() => {
+    setUserId(getOrCreateUserId());
+  }, []);
+
   useEffect(() => {
     setSidebarW(
       Math.round(Math.max(180, Math.min(400, window.innerWidth * 0.18))),
@@ -141,7 +160,10 @@ export function AdkWorkbench() {
 
   // 從 ADK 載入 session 清單，合併 localStorage 的歷史訊息
   useEffect(() => {
-    fetch('/api/agent/sessions', { cache: 'no-store' })
+    if (userId === 'anonymous') return;
+    fetch(`/api/agent/sessions?userId=${encodeURIComponent(userId)}`, {
+      cache: 'no-store',
+    })
       .then((res) => (res.ok ? res.json() : Promise.reject()))
       .then((data: { sessions: SessionRecord[] }) => {
         if (!Array.isArray(data.sessions) || data.sessions.length === 0) return;
@@ -168,7 +190,7 @@ export function AdkWorkbench() {
       .catch(() => {
         // ADK 離線 — 保留 initialSessions 作為示範資料
       });
-  }, []);
+  }, [userId]);
 
   // sessions 更新且非處理中時，自動持久化歷史訊息到 localStorage
   useEffect(() => {
@@ -304,6 +326,7 @@ export function AdkWorkbench() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         sessionId: newSession.id,
+        userId,
         state: {
           _ui_title: newSession.title,
           _ui_subtitle: newSession.subtitle,
@@ -361,9 +384,12 @@ export function AdkWorkbench() {
     // 清除 localStorage 歷史紀錄
     removeSessionHistory(sessionId);
     // 從 ADK 刪除 session（fire and forget）
-    fetch(`/api/agent/sessions/${encodeURIComponent(sessionId)}`, {
-      method: 'DELETE',
-    }).catch(() => {
+    fetch(
+      `/api/agent/sessions/${encodeURIComponent(sessionId)}?userId=${encodeURIComponent(userId)}`,
+      {
+        method: 'DELETE',
+      },
+    ).catch(() => {
       /* ADK 離線，靜默忽略 */
     });
   }
@@ -430,6 +456,7 @@ export function AdkWorkbench() {
         body: JSON.stringify({
           prompt,
           sessionId: activeSessionId,
+          userId,
           sessionState: {
             ...activeSession.state,
             _ui_title: activeSession.title,

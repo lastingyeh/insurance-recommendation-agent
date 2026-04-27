@@ -16,7 +16,7 @@
 
 ### 2.1 已存在的能力
 
-- app/agent.py 已有 create_agent 與 root_agent，可直接作為 FastAPI service 的 agent factory
+- app/agent.py 是正式的 create_agent 與 root_agent 入口，可直接作為 FastAPI service 的 agent factory
 - app/app_runtime.py 已集中管理 app name、toolbox URL、session DB URI、model name 等 runtime 設定
 - app/tools/session_tools.py 已把對話所需的狀態欄位收斂在 ADK state 內
 - pyproject.toml 已經安裝 fastapi 與 uvicorn，相依不需要重新補齊

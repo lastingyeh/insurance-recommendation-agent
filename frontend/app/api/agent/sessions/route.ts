@@ -5,12 +5,15 @@ export const dynamic = 'force-dynamic';
 const getBaseUrl = () =>
   process.env.FASTAPI_BASE_URL ?? 'http://127.0.0.1:8080';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const userId = request.nextUrl.searchParams.get('userId');
     const baseUrl = getBaseUrl();
-    const upstreamUrl = `${baseUrl.replace(/\/$/, '')}/api/agent/sessions`;
+    const upstreamPath = '/api/agent/sessions';
+    const upstreamUrl = new URL(`${baseUrl.replace(/\/$/, '')}${upstreamPath}`);
+    if (userId) upstreamUrl.searchParams.set('userId', userId);
 
-    const response = await fetch(upstreamUrl, {
+    const response = await fetch(upstreamUrl.toString(), {
       method: 'GET',
       headers: { Accept: 'application/json' },
       cache: 'no-store',
@@ -37,6 +40,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as {
       sessionId: string;
+      userId?: string;
       state?: Record<string, string>;
     };
 

@@ -27,6 +27,9 @@ def is_echoed_user_input(event: Event, prompt: str) -> bool:
     if any(part.function_response for part in event.content.parts):
         return False
 
+    if any(part.function_call for part in event.content.parts):
+        return False
+
     normalized_prompt = prompt.strip()
     return any(
         (part.text or "").strip() == normalized_prompt for part in event.content.parts
@@ -147,7 +150,9 @@ def map_adk_event_to_envelopes(event: Event, sequence: int) -> list[dict[str, ob
                     "event": {
                         "id": f"{suffix}-{'stream' if event.partial else 'agent'}",
                         "kind": "stream" if event.partial else "agent",
-                        "title": "partial_response" if event.partial else "agent_response",
+                        "title": (
+                            "partial_response" if event.partial else "agent_response"
+                        ),
                         "summary": text,
                         "timestamp": timestamp,
                         "payload": [
@@ -202,8 +207,9 @@ class AgentRunService:
         self,
         session_id: str,
         initial_state: dict[str, str] | None = None,
+        user_id: str | None = None,
     ) -> None:
-        await self._sessions.ensure_session(session_id, initial_state)
+        await self._sessions.ensure_session(session_id, initial_state, user_id=user_id)
 
     async def stream(
         self,
@@ -211,17 +217,21 @@ class AgentRunService:
         prompt: str,
         session_id: str,
         session_state: dict[str, str] | None = None,
+        user_id: str | None = None,
     ) -> AsyncGenerator[dict[str, object], None]:
         sequence = 0
         current_text = ""
         merged_state = dict(session_state or {})
+        resolved_user_id = (
+            user_id.strip() if user_id and user_id.strip() else self._config.api_user_id
+        )
 
         yield build_meta_envelope()
 
         try:
             async for event in iter_run_events(
                 self._runner,
-                user_id=self._config.api_user_id,
+                user_id=resolved_user_id,
                 session_id=session_id,
                 prompt=prompt,
                 state_delta=session_state,
@@ -246,6 +256,7 @@ class AgentRunService:
             final_state = await self._sessions.get_state(
                 session_id=session_id,
                 fallback_state=merged_state,
+                user_id=user_id,
             )
             yield build_done_envelope(
                 final_text=current_text

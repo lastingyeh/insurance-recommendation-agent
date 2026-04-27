@@ -1,392 +1,400 @@
-# 系統架構說明（Architecture）
+# 系統架構說明
 
-本文件說明本專案的最終系統架構、元件責任、資料流，以及為什麼採用 `tools.yaml + ToolboxToolset + MCP Toolbox` 的整合方式來完成保險推薦代理。
+本文件描述目前保險推薦代理後端的實際模組切分、依賴方向與請求流程。
+
+目前的設計目標是：
+
+* 後端結構簡潔
+* FastAPI 只負責 HTTP 邊界
+* Agent 建立流程集中管理
+* 業務邏輯集中在 service 層
+* 工具與 prompt 保持獨立且可替換
 
 ---
 
-## 一、最終架構總覽
+## 一、目前目錄結構
 
-本專案的最終高階架構如下：
+目前後端核心目錄如下：
 
 ```text
-使用者
--> Google ADK Agent
+app/
+  agent.py
+  config.py
+  container.py
+  session_state.py
+  api/
+    dependencies.py
+    main.py
+    schemas.py
+    sse.py
+    routes/
+      run.py
+      sessions.py
+  services/
+    agent_run_service.py
+    readiness_service.py
+    session_service.py
+  tools/
+    session_tools.py
+  prompts/
+    insurance_agent_prompt.txt
+```
+
+### 模組關係圖
+
+```mermaid
+flowchart LR
+    Client[Frontend / Client]
+    Api[FastAPI API]
+    Routes[API Routes]
+    Container[AppContainer]
+    Services[Services]
+    AgentFactory[AgentFactory]
+    Prompt[Prompt Loader]
+    Tools[Session Tools]
+    Runner[ADK Runner]
+    SessionStore[ADK Session Store]
+    Toolbox[ToolboxToolset]
+    MCP[MCP Toolbox]
+    Data[(tools.yaml / SQLite / external sources)]
+
+    Client --> Api
+    Api --> Routes
+    Api --> Container
+    Routes --> Services
+    Container --> Services
+    Container --> AgentFactory
+    Container --> Runner
+    Container --> SessionStore
+    AgentFactory --> Prompt
+    AgentFactory --> Tools
+    AgentFactory --> Toolbox
+    Services --> Runner
+    Services --> SessionStore
+    Runner --> Toolbox
+    Toolbox --> MCP
+    MCP --> Data
+```
+
+---
+
+## 二、模組責任
+
+### 1. config
+
+app/config.py 負責：
+
+* 讀取環境變數
+* 建立 AppRuntimeConfig
+* 提供 runtime 設定給 container、agent 與 services
+
+這一層只處理設定，不負責任何業務流程。
+
+---
+
+### 2. container
+
+app/container.py 是後端組裝中心，負責：
+
+* 建立 ADK Agent
+* 建立 session store
+* 建立 ADK Runner
+* 建立 session、agent run、readiness 等 services
+* 聚合成 AppContainer
+
+這一層只做依賴組裝，不承擔 HTTP 邏輯，也不承擔對話邏輯。
+
+---
+
+### 3. agent
+
+app/agent.py 是正式且唯一的 Agent 建立入口，負責：
+
+* 建立 ToolboxToolset
+* 組合 session tools
+* 建立 ADK Agent
+* 提供 AgentFactory 與 create_agent()
+* 載入 agent prompt 檔案
+
+這樣 agent 建立邏輯維持在單一檔案，後續如果要替換 model、toolbox 或 prompt 載入策略，只需要改 app/agent.py。
+
+---
+
+### 4. api
+
+app/api/ 專注在 FastAPI 的 HTTP 邊界。
+
+#### main.py
+
+負責：
+
+* 建立 FastAPI app
+* 掛載 CORS
+* 註冊 health/readiness endpoint
+* 掛載 routes
+
+#### dependencies.py
+
+負責：
+
+* 從 app state 或快取中取得 AppContainer
+* 提供測試用 cache reset
+
+這一層已刻意縮減，只保留 API 真正需要的 container 入口。
+
+#### routes/run.py
+
+負責：
+
+* /api/agent/run
+* 驗證 prompt 與 sessionId
+* 轉呼叫 AgentRunService
+* 回傳 SSE 串流
+
+#### routes/sessions.py
+
+負責：
+
+* session list/create/delete API
+* 轉呼叫 SessionService
+
+#### schemas.py
+
+負責：
+
+* request schema 定義
+
+#### sse.py
+
+負責：
+
+* SSE event encoding
+
+這個切分原則是：
+
+* API 層只做 request/response 與 transport
+* API 層不直接承擔業務邏輯
+
+---
+
+### 5. services
+
+app/services/ 是主要業務邏輯層。
+
+#### session_service.py
+
+負責：
+
+* 建立或查詢 session
+* 刪除 session
+* 整理 session list 給 API 使用
+* 處理公開 state 與 UI state 過濾
+
+#### agent_run_service.py
+
+負責：
+
+* 確保 session 存在
+* 驅動 ADK Runner 執行
+* 將 ADK event 轉為 API 可傳輸的 envelope
+* 合併 state patch
+* 輸出最終 done 或 error event
+
+#### readiness_service.py
+
+負責：
+
+* 檢查 session store 是否可用
+* 檢查 toolbox server 是否可連線
+
+這層是目前後端的核心，所有與保險推薦 runtime 有關的業務流程都應優先放在 service，而不是 route。
+
+---
+
+### 6. tools
+
+app/tools/session_tools.py 是註冊給 ADK Agent 的本地工具，負責：
+
+* 讀取使用者 profile snapshot
+* 寫入使用者 profile 到 session state
+* 保存最後推薦商品
+* 清除最後推薦商品
+
+這些工具只處理 session state，不直接處理 HTTP，也不直接處理資料庫查詢。
+
+---
+
+### 7. prompts
+
+app/prompts/insurance_agent_prompt.txt 定義 agent 的核心指令，負責：
+
+* 對話策略
+* 追問規則
+* 工具選擇原則
+* 推薦輸出格式與治理限制
+
+prompt 只負責行為約束，不應承擔程式組裝責任。
+
+---
+
+### 8. session_state
+
+app/session_state.py 定義 session state key 的規則，負責：
+
+* 使用者 profile key 清單
+* 最後推薦商品 key 清單
+* UI state key 規則
+
+這個模組的目的，是把 state key 定義從 service 與 tool 中抽出，避免魔法字串散落。
+
+---
+
+## 三、請求流程
+
+### 1. Session 管理流程
+
+```text
+HTTP Request
+-> FastAPI route
+-> SessionService
+-> ADK Session Store
+-> JSON Response
+```
+
+說明：
+
+* route 驗證輸入
+* SessionService 處理 session 查詢、建立、刪除
+* API 回傳前端需要的格式
+
+---
+
+### 2. Agent 執行流程
+
+```text
+HTTP Request
+-> /api/agent/run
+-> AgentRunService
+-> ADK Runner
+-> Agent
+-> Local Session Tools / ToolboxToolset
+-> SSE Response
+```
+
+更細的執行順序如下：
+
+1. 前端送出 prompt、sessionId、sessionState
+2. route 驗證必要欄位
+3. AgentRunService 確保 session 已存在
+4. Runner 將訊息送進 ADK Agent
+5. Agent 依 prompt 決定是否追問、使用本地 state tools、或呼叫 ToolboxToolset
+6. 服務層把 ADK events 轉成 timeline、message、state、done、error envelopes
+7. API 透過 SSE 持續送回前端
+
+---
+
+## 四、依賴方向
+
+目前遵守的依賴方向如下：
+
+```text
+api -> services -> ADK/runtime integrations
+container -> agent/services/config
+agent -> prompts/tools/config
+tools -> session_state
+```
+
+限制原則：
+
+* service 不反向依賴 container
+* route 不承擔業務邏輯
+* API 不直接格式化 session 規則
+* agent factory 不依賴 FastAPI
+
+這些限制的目的是降低循環依賴與模組跳轉成本。
+
+---
+
+## 五、為什麼採用這種切分
+
+### 1. 避免過多設計模式
+
+本專案沒有引入複雜的 use case、repository、adapter 階層，而是維持簡單分工：
+
+* api 處理 HTTP
+* services 處理業務流程
+* agents 處理 agent 組裝
+* tools 處理 ADK 可呼叫工具
+* config 與 container 處理 runtime 組裝
+
+這樣的切分對目前規模足夠，並且維護成本低。
+
+### 2. 保持擴充彈性
+
+當後續要擴充時，切分仍然足夠清楚：
+
+* 新增 API endpoint：放進 api/routes
+* 新增 agent 建立策略：放進 agents
+* 新增業務流程：放進 services
+* 新增狀態工具：放進 tools
+
+### 3. 降低修改風險
+
+目前的模組責任比較單純，因此修改時通常只會影響一個區塊：
+
+* 調整 request schema，不需要碰 service
+* 調整 toolbox 組裝，不需要碰 routes
+* 調整 session state key，不需要碰 FastAPI app 組裝
+
+---
+
+## 六、與 Toolbox / MCP 的關係
+
+雖然後端已經整理成 FastAPI + services + agents 的結構，但保險資料查詢能力仍來自 MCP Toolbox。
+
+整體關係如下：
+
+```text
+FastAPI API
+-> AgentRunService
+-> ADK Agent
 -> ToolboxToolset
 -> MCP Toolbox
 -> tools.yaml
--> SQLite insurance.db
+-> SQLite / external sources
 ```
 
-這個架構的核心思想是：
+這表示：
 
-* **Agent 不直接自由查資料庫**
-* **資料查詢能力由 MCP Toolbox 中的受控工具提供**
-* **工具定義集中於 `tools.yaml`**
-* **ADK Agent 負責對話、追問、工具選擇與結果解釋**
-
----
-
-## 二、元件責任分工
-
-### 1. 使用者（User）
-
-使用者負責輸入需求，例如：
-
-* 年齡
-* 預算
-* 保障目標
-* 家庭狀況
-* 是否已有保單
-
-使用者輸入可能完整，也可能不完整，因此系統必須具備追問能力。
+* FastAPI 是對前端的應用邊界
+* ADK Agent 是對話與工具調度核心
+* ToolboxToolset 是 ADK 與 MCP Toolbox 的橋接
+* MCP Toolbox 與 tools.yaml 提供受控查詢能力
 
 ---
 
-### 2. Google ADK Agent
+## 七、目前適合的維護規則
 
-ADK Agent 是整個系統的對話與決策核心，負責：
+後續維護建議遵守以下規則：
 
-* 接收使用者需求
-* 判斷資訊是否足夠
-* 在資訊不足時先追問
-* 根據保障目標選擇正確工具
-* 整合工具結果
-* 生成最終推薦回覆
-* 補充推薦原因、限制、等待期、除外條款與保守聲明
-
-ADK Agent **不應直接產生任意 SQL**，而是透過 MCP Toolbox 提供的受控工具完成資料查詢。
+1. 單一功能若只有一個檔案，不要額外拆成一層子目錄。
+2. Route 只處理 HTTP 驗證、錯誤映射與回應格式。
+3. Service 優先依賴 config、runner、session store，不要反向依賴 container。
+4. Prompt 與 tools 不要混進 FastAPI 或 service 的組裝細節。
+5. 若某段格式化邏輯只被單一 service 使用，就放回該 service 附近，而不是額外抽成空泛目錄。
 
 ---
 
-### 3. ToolboxToolset
+## 八、結論
 
-`ToolboxToolset` 是 ADK 與 MCP Toolbox 之間的橋接層，負責：
+目前的後端架構是一個以 Google ADK 為核心、以 FastAPI 為外部 API 邊界、以 service 層承接業務流程的簡潔設計。
 
-* 讓 ADK Agent 透過 MCP 協定連接 Toolbox
-* 將 Toolbox 中註冊好的 tools 提供給 Agent 使用
-* 讓 Agent 在不直接接觸資料庫的情況下呼叫工具
+它的重點不是模式數量，而是責任明確：
 
-換句話說，`ToolboxToolset` 是 **Agent 看到工具的入口**。
+* API 清楚
+* Agent 組裝集中
+* 業務流程集中
+* 工具與 prompt 分離
+* container 只做組裝
 
----
-
-### 4. MCP Toolbox
-
-MCP Toolbox 是本專案的工具供應層，負責：
-
-* 載入 `tools.yaml`
-* 初始化資料來源（source）
-* 初始化保險專用工具（tool）
-* 初始化工具群組（toolset）
-* 初始化可重用 prompts
-* 對外提供 MCP server 介面，供 ADK Agent 使用
-
-MCP Toolbox 的價值在於：
-
-* 工具可集中配置
-* 查詢邏輯可受控
-* 工具行為可追溯
-* 後續更容易切換資料來源或擴充新工具
-
----
-
-### 5. tools.yaml
-
-`tools.yaml` 是本專案的工具配置中心，負責定義：
-
-* `source`：資料來源
-* `tool`：可被 Agent 調用的保險工具
-* `toolset`：工具分組
-* `prompt`：可重用的提示模板
-
-目前本專案已在 `tools.yaml` 中定義：
-
-#### source
-
-* `insurance_sqlite`
-
-#### tools
-
-* `search_medical_products`
-* `search_accident_products`
-* `search_family_protection_products`
-* `search_income_protection_products`
-* `get_product_detail`
-* `get_recommendation_rules`
-
-#### toolsets
-
-* `insurance_recommendation_tools`
-* `insurance_debug_tools`
-
-#### prompts
-
-* `insurance_recommendation_response_template`
-* `insurance_followup_question_template`
-
----
-
-### 6. SQLite
-
-SQLite 是目前的資料層，負責儲存保險推薦所需資料。
-
-目前主要資料表包括：
-
-* `insurance_products`
-* `recommendation_rules`
-* `user_profiles_demo`
-* `faq_knowledge`
-
-其中最主要會被推薦流程使用的是：
-
-#### insurance_products
-
-存放商品名稱、類型、年齡限制、保費範圍、保障摘要、等待期、除外條款等資料。
-
-#### recommendation_rules
-
-存放推薦規則與規則優先順序，供 Agent 補充推薦依據。
-
----
-
-## 三、推薦流程（Recommendation Workflow）
-
-本專案的推薦流程如下：
-
-### Step 1：使用者輸入需求
-
-例如：
-
-* 「我 30 歲，年度保險預算 15000，想加強醫療保障，有什麼推薦？」
-* 「我想買保險，幫我推薦。」
-* 「我 42 歲，已婚有小孩，年度預算 30000，想補家庭保障。」
-
----
-
-### Step 2：Agent 檢查資訊是否足夠
-
-Agent 先判斷是否已具備以下必要資訊：
-
-* 年齡
-* 預算
-* 主要保障目標
-
-若缺少其中任一項，Agent 應先追問，而不是直接推薦商品。
-
----
-
-### Step 3：Agent 選擇對應工具
-
-當資訊足夠時，Agent 會依保障目標選擇對應工具，例如：
-
-* `medical` -> `search_medical_products`
-* `accident` -> `search_accident_products`
-* `family_protection` -> `search_family_protection_products`
-* `income_protection` -> `search_income_protection_products`
-* `life` -> `search_family_protection_products`
-
-這樣做的目的是讓工具邊界更清楚，避免讓 Agent 自己決定太多 SQL 細節。
-
----
-
-### Step 4：查詢候選商品
-
-Agent 透過 ToolboxToolset 呼叫 MCP Toolbox 中對應的工具。
-
-例如家庭保障場景可能會呼叫：
-
-* `search_family_protection_products`
-* `get_recommendation_rules`
-
-若需要補商品細節，再呼叫：
-
-* `get_product_detail`
-
----
-
-### Step 5：Agent 生成推薦回覆
-
-Agent 根據工具輸出內容整理最終回答，通常包含：
-
-* 推薦商品名稱
-* 推薦原因
-* 預算或條件限制
-* 等待期
-* 除外條款
-* 規則依據
-* 保守聲明
-
----
-
-## 四、這種設計的優點
-
-### 1. 避免自由 SQL
-
-若讓模型自由產生 SQL，會帶來：
-
-* 權限風險
-* 查詢不穩定
-* 行為不易測試
-* 工具邊界模糊
-
-本專案改用 `tools.yaml` 定義受控工具，可有效降低這些問題。
-
----
-
-### 2. 提高可追溯性
-
-透過 ADK trace，可看到 Agent 實際呼叫了哪些工具，例如：
-
-* `search_medical_products`
-* `search_family_protection_products`
-* `get_recommendation_rules`
-
-這比單純依賴模型文字輸出更容易驗證。
-
----
-
-### 3. 提高維護性
-
-當商品搜尋邏輯需要調整時，只需修改：
-
-* `tools.yaml`
-* 或底層資料表
-
-而不需要讓 Agent prompt 不斷膨脹。
-
----
-
-### 4. 提高可測試性
-
-每個工具責任更明確後，測試案例也更容易設計。
-例如：
-
-* 醫療保障案例只驗證 `search_medical_products`
-* 家庭保障案例驗證 `search_family_protection_products + get_recommendation_rules`
-* 收入保障案例驗證 `search_income_protection_products`
-
----
-
-## 五、Prompt 與 Tool 的邊界
-
-本專案遵守以下原則：
-
-### Agent Prompt 負責
-
-* 判斷是否需要追問
-* 決定要用哪個工具
-* 解釋工具輸出結果
-* 組織最終推薦語言
-* 確保語氣保守合規
-
-### Toolbox Tools 負責
-
-* 執行受控資料查詢
-* 提供商品候選
-* 提供商品細節
-* 提供規則依據
-
-### 邊界原則
-
-* **Agent 不負責自由資料存取**
-* **Toolbox 不負責最終推薦話術**
-* **Agent 負責解釋，Toolbox 負責執行**
-
----
-
-## 六、目前已驗證的場景
-
-本專案目前至少已驗證以下場景：
-
-### 醫療保障
-
-輸入：
-
-* 30 歲
-* 年度預算 15000
-* 想加強醫療保障
-
-預期工具：
-
-* `search_medical_products`
-
----
-
-### 資訊不足
-
-輸入：
-
-* 想買保險，幫我推薦
-
-預期行為：
-
-* 不直接推薦
-* 先追問年齡、預算、保障目標
-
----
-
-### 家庭保障
-
-輸入：
-
-* 42 歲
-* 已婚有小孩
-* 年度預算 30000
-* 想補家庭保障
-
-預期工具：
-
-* `search_family_protection_products`
-* `get_recommendation_rules`
-
----
-
-## 七、目前架構的限制
-
-目前架構仍有以下限制：
-
-1. 商品資料為示範資料，非正式商品資料
-2. 尚未接入正式核保流程
-3. 尚未加入完整安全控制，例如 `allowed-origins`、`allowed-hosts`
-4. 尚未加入 embedding / FAQ semantic retrieval
-5. 目前互動仍以 ADK Dev UI 為主
-6. 推薦規則仍為第一版原型設計
-
----
-
-## 八、未來擴充方向
-
-未來可進一步擴充：
-
-### 1. FAQ 與條款語意檢索
-
-利用 embedding 功能建立 FAQ semantic retrieval 與條款檢索能力。
-
-### 2. 更細的場景工具
-
-將目前工具再拆成更細的場景，例如：
-
-* 低預算醫療保障
-* 熟齡醫療補強
-* 家庭責任強化
-* 收入中斷補強
-
-### 3. 正式資料源切換
-
-未來可由 SQLite 切換到正式資料庫，保留相同 Agent 與 Toolbox 設計。
-
-### 4. 前端介面
-
-加入正式前端 UI，讓推薦流程可作為業務或客服支援工具。
-
----
-
-## 九、結論
-
-本專案的最終架構重點在於：
-
-* 使用 **Google ADK** 管理對話與工具調度
-* 使用 **ToolboxToolset** 作為 ADK 與 Toolbox 的橋接
-* 使用 **MCP Toolbox + tools.yaml** 提供受控的保險專用工具
-* 使用 **SQLite** 提供原型資料來源
-* 透過清楚的 Prompt / Tool 邊界，建立可追溯、可測試、可擴充的保險推薦代理
+這個結構已足以支撐目前的保險推薦代理，同時保留未來擴充空間。

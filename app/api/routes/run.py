@@ -5,19 +5,16 @@ from collections.abc import AsyncGenerator
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from app.api.dependencies import get_container, get_runner as dependency_get_runner
+from app.api.dependencies import get_container
 from app.api.schemas import AgentRunRequest
-from app.api.streaming import encode_sse_event
+from app.api.sse import encode_sse_event
 from app.services.agent_run_service import AgentRunService
 
 router = APIRouter(prefix="/api/agent", tags=["agent"])
 
 
 def get_runner(request: Request | None = None):
-    if request is not None:
-        return get_container(request).runner
-
-    return dependency_get_runner()
+    return get_container(request).runner
 
 
 def get_agent_run_service(request: Request) -> AgentRunService:
@@ -48,7 +45,9 @@ async def run_agent(payload: AgentRunRequest, request: Request):
     run_service = get_agent_run_service(request)
 
     try:
-        await run_service.ensure_session(session_id, payload.sessionState)
+        await run_service.ensure_session(
+            session_id, payload.sessionState, user_id=payload.userId
+        )
     except Exception as exc:
         return JSONResponse(
             status_code=502,
@@ -60,6 +59,7 @@ async def run_agent(payload: AgentRunRequest, request: Request):
             prompt=prompt,
             session_id=session_id,
             session_state=payload.sessionState,
+            user_id=payload.userId,
         ):
             yield encode_sse_event(envelope)
 

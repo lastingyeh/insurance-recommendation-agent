@@ -6,9 +6,12 @@ from importlib import import_module
 from fastapi.testclient import TestClient
 from google.adk.events.event import Event
 from google.adk.events.event_actions import EventActions
+from google.adk.sessions.sqlite_session_service import SqliteSessionService
 from google.genai import types as genai_types
 
 from app.api.dependencies import reset_dependency_caches
+from app.config import AppRuntimeConfig
+from app.container import create_session_store
 
 
 def create_test_client(monkeypatch, tmp_path):
@@ -92,9 +95,28 @@ def test_session_crud_round_trip(monkeypatch, tmp_path):
     assert final_list_response.json() == {"sessions": []}
 
 
+def test_create_session_store_uses_sqlite_service_for_sqlite_plus_aiosqlite_uri():
+    config = AppRuntimeConfig(
+        app_name="app",
+        api_user_id="test-user",
+        toolbox_server_url="http://127.0.0.1:5999",
+        session_db_uri="sqlite+aiosqlite:///./db/adk_sessions.db",
+        memory_mode="in_memory",
+        model_name="gemini-3-flash-preview",
+        fastapi_host="127.0.0.1",
+        fastapi_port=8080,
+        fastapi_reload=False,
+        cors_allow_origins=("http://localhost:3000",),
+    )
+
+    session_store = create_session_store(config)
+
+    assert isinstance(session_store, SqliteSessionService)
+
+
 def test_run_stream_returns_sse_envelopes(monkeypatch, tmp_path):
     client = create_test_client(monkeypatch, tmp_path)
-    run_module = import_module("app.api.run")
+    run_module = import_module("app.api.routes.run")
 
     class FakeRunner:
         async def run_async(
@@ -199,7 +221,7 @@ def test_run_stream_returns_sse_envelopes(monkeypatch, tmp_path):
 
 def test_run_stream_returns_error_envelope_when_runner_fails(monkeypatch, tmp_path):
     client = create_test_client(monkeypatch, tmp_path)
-    run_module = import_module("app.api.run")
+    run_module = import_module("app.api.routes.run")
 
     class FailingRunner:
         async def run_async(

@@ -5,7 +5,7 @@ from functools import lru_cache
 from fastapi import Request
 
 from app.container import AppContainer, build_app_container
-from app.config import AppRuntimeConfig, load_runtime_config
+from app.config import load_runtime_config
 
 
 @lru_cache(maxsize=1)
@@ -20,22 +20,6 @@ def get_container(request: Request | None = None) -> AppContainer:
             return container
 
     return _get_cached_container()
-
-
-def get_runtime_config(request: Request | None = None) -> AppRuntimeConfig:
-    return get_container(request).config
-
-
-def get_agent(request: Request | None = None):
-    return get_container(request).agent
-
-
-def get_session_service(request: Request | None = None):
-    return get_container(request).session_store
-
-
-def get_runner(request: Request | None = None):
-    return get_container(request).runner
 
 
 def reset_dependency_caches() -> None:

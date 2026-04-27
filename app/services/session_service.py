@@ -85,10 +85,15 @@ class SessionService:
         self._session_store = session_store
         self._config = config
 
-    async def list_sessions(self) -> list[dict[str, Any]]:
+    def _resolve_user_id(self, user_id: str | None) -> str:
+        if user_id and user_id.strip():
+            return user_id.strip()
+        return self._config.api_user_id
+
+    async def list_sessions(self, user_id: str | None = None) -> list[dict[str, Any]]:
         response = await self._session_store.list_sessions(
             app_name=self._config.app_name,
-            user_id=self._config.api_user_id,
+            user_id=self._resolve_user_id(user_id),
         )
 
         sessions = [to_session_list_item(session) for session in response.sessions]
@@ -103,10 +108,12 @@ class SessionService:
         self,
         session_id: str,
         initial_state: dict[str, Any] | None = None,
+        user_id: str | None = None,
     ) -> Session:
+        resolved_user_id = self._resolve_user_id(user_id)
         existing = await self._session_store.get_session(
             app_name=self._config.app_name,
-            user_id=self._config.api_user_id,
+            user_id=resolved_user_id,
             session_id=session_id,
         )
         if existing is not None:
@@ -114,15 +121,16 @@ class SessionService:
 
         return await self._session_store.create_session(
             app_name=self._config.app_name,
-            user_id=self._config.api_user_id,
+            user_id=resolved_user_id,
             session_id=session_id,
             state=initial_state or {},
         )
 
-    async def delete_session(self, session_id: str) -> None:
+    async def delete_session(self, session_id: str, user_id: str | None = None) -> None:
+        resolved_user_id = self._resolve_user_id(user_id)
         existing = await self._session_store.get_session(
             app_name=self._config.app_name,
-            user_id=self._config.api_user_id,
+            user_id=resolved_user_id,
             session_id=session_id,
         )
         if existing is None:
@@ -130,7 +138,7 @@ class SessionService:
 
         await self._session_store.delete_session(
             app_name=self._config.app_name,
-            user_id=self._config.api_user_id,
+            user_id=resolved_user_id,
             session_id=session_id,
         )
 
@@ -138,10 +146,12 @@ class SessionService:
         self,
         session_id: str,
         fallback_state: dict[str, str] | None = None,
+        user_id: str | None = None,
     ) -> dict[str, str]:
+        resolved_user_id = self._resolve_user_id(user_id)
         session = await self._session_store.get_session(
             app_name=self._config.app_name,
-            user_id=self._config.api_user_id,
+            user_id=resolved_user_id,
             session_id=session_id,
         )
 

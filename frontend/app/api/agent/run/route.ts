@@ -12,6 +12,7 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as {
       prompt?: string;
       sessionId?: string;
+      userId?: string;
       sessionState?: Record<string, string>;
     };
 

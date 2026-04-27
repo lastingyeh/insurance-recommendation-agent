@@ -6,11 +6,11 @@ const getBaseUrl = () =>
   process.env.FASTAPI_BASE_URL ?? 'http://127.0.0.1:8080';
 
 export async function DELETE(
-  _: NextRequest,
-  { params }: { params: { sessionId: string } },
+  request: NextRequest,
+  { params }: { params: Promise<{ sessionId: string }> },
 ) {
   try {
-    const { sessionId } = params;
+    const { sessionId } = await params;
 
     if (!sessionId?.trim()) {
       return NextResponse.json(
@@ -19,10 +19,14 @@ export async function DELETE(
       );
     }
 
+    const userId = request.nextUrl.searchParams.get('userId');
     const baseUrl = getBaseUrl();
-    const upstreamUrl = `${baseUrl.replace(/\/$/, '')}/api/agent/sessions/${encodeURIComponent(sessionId)}`;
+    const upstreamUrl = new URL(
+      `${baseUrl.replace(/\/$/, '')}/api/agent/sessions/${encodeURIComponent(sessionId)}`,
+    );
+    if (userId) upstreamUrl.searchParams.set('userId', userId);
 
-    const response = await fetch(upstreamUrl, {
+    const response = await fetch(upstreamUrl.toString(), {
       method: 'DELETE',
       headers: { Accept: 'application/json' },
     });

@@ -49,3 +49,9 @@ eval = ["google-adk[eval]>=1.31.1"]
 
 [tool.setuptools.packages.find]
 include = ["app*"]
+
+[tool.pytest.ini_options]
+filterwarnings = [
+  "ignore:authlib\\.jose module is deprecated, please use joserfc instead\\.:authlib.deprecate.AuthlibDeprecationWarning",
+  "ignore:\\[EXPERIMENTAL\\] feature FeatureName\\.PLUGGABLE_AUTH is enabled\\.:UserWarning",
+]

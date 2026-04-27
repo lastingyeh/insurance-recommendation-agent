@@ -26,10 +26,13 @@ def _normalize_sqlite_db_path(session_db_uri: str) -> str:
     return db_path or ":memory:"
 
 
-def create_session_store(config: AppRuntimeConfig) -> BaseSessionService:
-    parsed = urlparse(config.session_db_uri)
+def _is_sqlite_session_uri(session_db_uri: str) -> bool:
+    parsed = urlparse(session_db_uri)
+    return parsed.scheme.split("+", 1)[0] == "sqlite"
 
-    if parsed.scheme == "sqlite":
+
+def create_session_store(config: AppRuntimeConfig) -> BaseSessionService:
+    if _is_sqlite_session_uri(config.session_db_uri):
         return SqliteSessionService(
             db_path=_normalize_sqlite_db_path(config.session_db_uri)
         )
