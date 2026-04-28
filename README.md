@@ -79,12 +79,16 @@ insurance-recommendation-agent/
 ├── app
 │   ├── __init__.py
 │   ├── agent.py
-│   ├── prompts
+│   ├── config.py
+│   ├── container.py
+│   ├── session_state.py
+│   ├── api/
+│   ├── prompts/
 │   │   └── insurance_agent_prompt.txt
-│   └── tools
+│   ├── services/
+│   └── tools/
 │       └── session_tools.py
 ├── archi.png
-├── data
 ├── db
 │   ├── insurance.db
 │   ├── schema.sql
@@ -92,31 +96,15 @@ insurance-recommendation-agent/
 │   └── tools.yaml
 ├── docker-compose.yml
 ├── docs
-│   ├── architecture.md
-│   ├── demo_script.md
-│   ├── embedding.md
-│   ├── governance.md
-│   ├── limitations.md
-│   ├── prompt_tool_contract.md
-│   └── summary.md
+├── frontend
+│   ├── app/
+│   ├── components/
+│   ├── lib/
+│   ├── next.config.ts
+│   ├── package.json
+│   └── tsconfig.json
 ├── pyproject.toml
 ├── tests
-│   ├── evals
-│   │   ├── insurance_core.test.json
-│   │   ├── insurance_extended.test.json
-│   │   ├── safety
-│   │   │   ├── case_09_system_capability.test.json
-│   │   │   ├── case_10_no_guarantee.test.json
-│   │   │   ├── case_11_rule_explanation.test.json
-│   │   │   ├── case_12_product_detail_follow_up.test.json
-│   │   │   └── case_13_no_investment_return.test.json
-│   │   ├── session_aware
-│   │   │   ├── case_s1_reuse_existing_profile.test.json
-│   │   │   ├── case_s2_follow_up_with_last_product.test.json
-│   │   │   └── case_s3_update_budget.test.json
-│   │   └── test_config.json
-│   ├── test_cases.md
-│   └── test_result_template.md
 └── uv.lock
 ```
 
@@ -135,40 +123,6 @@ insurance-recommendation-agent/
 ---
 
 ## 已定義的工具與模板
-
-### Source
-
-- insurance_sqlite
-
-### Tools
-
-- search_medical_products
-- search_accident_products
-- search_family_protection_products
-- search_income_protection_products
-- get_product_by_name
-- get_product_detail
-- get_recommendation_rules
-
-│   ├── config.py
-│   ├── container.py
-│   ├── session_state.py
-│   ├── api
-│   │   ├── dependencies.py
-│   │   ├── main.py
-│   │   ├── routes
-│   │   │   ├── run.py
-│   │   │   └── sessions.py
-│   │   ├── schemas.py
-│   │   └── sse.py
-│   ├── prompts
-│   │   └── insurance_agent_prompt.txt
-│   ├── services
-│   │   ├── agent_run_service.py
-│   │   ├── readiness_service.py
-│   │   └── session_service.py
-│   └── tools
-│       └── session_tools.py
 
 ### Prompts
 
