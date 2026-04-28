@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
 
 from google.adk.agents import Agent
@@ -19,106 +18,76 @@ from app.tools.session_tools import (
     save_user_profile,
 )
 
-
+# 定義提示詞檔案的路徑，該檔案包含保險代理人的系統指令
 PROMPT_PATH = Path(__file__).resolve().parent / "prompts" / "insurance_agent_prompt.txt"
 
-_PROFILE_KEY_LABELS: dict[str, str] = {
-    "user:age": "年齡",
-    "user:budget": "預算",
-    "user:main_goal": "主要保障目標",
-    "user:marital_status": "婚姻狀態",
-    "user:has_children": "是否有小孩",
-    "user:existing_coverage": "既有保障",
-    "user:risk_preference": "風險偏好",
-    "user:last_recommended_product_name": "最近推薦商品",
-    "user:last_recommended_product_id": "最近推薦商品 ID",
-}
-
-
 def load_agent_prompt() -> str:
+    """
+    從檔案中讀取保險代理人的系統提示詞 (System Prompt)。
+    """
     return PROMPT_PATH.read_text(encoding="utf-8")
 
 
-# def inject_profile_context(
-#     callback_context: CallbackContext,
-#     llm_request: LlmRequest,
-# ) -> LlmResponse | None:
-#     """
-#     Before each model call, read the session state and prepend existing user
-#     profile data to the system instruction.  This guarantees the model always
-#     sees the profile snapshot even if it forgets to call get_user_profile_snapshot
-#     first, providing a code-level safety net on top of the prompt rule.
-#     """
-#     snapshot: dict[str, object] = {}
-#     for key in TRACKED_PROFILE_STATE_KEYS:
-#         value = callback_context.state.get(key)
-#         if value is not None:
-#             snapshot[key] = value
-
-#     if not snapshot:
-#         return None
-
-#     lines = ["【目前 Session 已存在以下使用者資料，請優先沿用，不要重新逐項追問】"]
-#     for key, value in snapshot.items():
-#         label = _PROFILE_KEY_LABELS.get(key, key)
-#         lines.append(f"  - {label}: {value}")
-#     profile_block = "\n".join(lines)
-
-#     config = llm_request.config
-#     if config is None:
-#         return None
-
-#     existing = config.system_instruction
-#     if existing is None:
-#         config.system_instruction = profile_block
-#     elif isinstance(existing, str):
-#         config.system_instruction = f"{profile_block}\n\n---\n{existing}"
-#     else:
-#         # Content object — prepend to the first text part
-#         if hasattr(existing, "parts") and existing.parts:
-#             first_text = getattr(existing.parts[0], "text", "") or ""
-#             existing.parts[0].text = f"{profile_block}\n\n---\n{first_text}"
-
-#     return None
-
-
 class AgentFactory:
+    """
+    代理人配置工廠類別，負責初始化代理人所需的工具集與核心物件。
+    """
     def __init__(self, config) -> None:
+        """
+        初始化工廠。
+        :param config: AppRuntimeConfig 執行階段配置實例
+        """
         self._config = config
 
     def create_toolbox(self) -> ToolboxToolset:
+        """
+        建立 Toolbox 工具集，用於與外部 MCP (Model Context Protocol) 伺服器通訊。
+        MCP 伺服器通常提供保險產品檢索等核心業務功能。
+        """
         return ToolboxToolset(
             server_url=self._config.toolbox_server_url,
             protocol=Protocol.MCP_LATEST,
         )
 
     def build_tools(self) -> list[object]:
+        """
+        建構代理人可使用的工具列表。
+        包含本地 Session 處理工具與遠端 Toolbox 工具。
+        """
         return [
-            get_user_profile_snapshot,
-            save_user_profile,
-            save_last_recommendation,
-            clear_last_recommendation,
-            self.create_toolbox(),
+            get_user_profile_snapshot,  # 獲取使用者個人資料快照
+            save_user_profile,          # 儲存/更新使用者個人資料
+            save_last_recommendation,   # 儲存最後一次的推薦結果
+            clear_last_recommendation,  # 清除最後一次的推薦紀錄
+            self.create_toolbox(),      # 遠端工具集 (提供保險知識庫檢索等)
         ]
 
     def create(self) -> Agent:
+        """
+        建立並回傳 Google ADK Agent 實例。
+        """
         return Agent(
             name=self._config.app_name,
             model=self._config.model_name,
             instruction=load_agent_prompt(),
             tools=self.build_tools(),
-            # before_model_callback=inject_profile_context,
         )
 
 
 def create_agent(config=None) -> Agent:
+    """
+    輔助函式：根據配置建立代理人。
+    如果未提供配置，則會載入預設的執行階段配置。
+    """
     runtime_config = config or load_runtime_config()
     return AgentFactory(runtime_config).create()
 
 
+# 建立全域的 root_agent 實例供應用程式使用
 root_agent = create_agent()
 
 
+# 測試進入點（目前已註解掉）
 # async def main():
 #     config = load_runtime_config()
 #     agent = create_agent(config)

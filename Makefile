@@ -21,6 +21,7 @@ FASTAPI_PORT := 8080
 FRONTEND_DIR := frontend
 EVAL_DIR := tests/evals
 EVAL_CONFIG := $(EVAL_DIR)/test_config.json
+DEBUG_PORT ?= 5678
 
 # ─── 環境建立 ──────────────────────────────────────────────
 install: ## 建立虛擬環境並安裝所有依賴
@@ -84,6 +85,20 @@ run-api: _kill-port ## 以 ADK API Server 啟動 Agent
 		export $$(grep -v '^#' .env | xargs); \
 	fi; \
 	$(ADK) api_server .
+
+# 啟動具有 debug 模式的本地後端伺服器
+# 用法：make debug-backend [PORT=8000] [DEBUG_PORT=5678]
+# 注意：debugpy 與 uvicorn --reload 在 macOS 上容易造成埠號衝突，debug target 預設停用熱重載
+debug-fastapi:
+	$(call ensure_port_free,$(or $(PORT),8080))
+	$(call ensure_port_free,$(DEBUG_PORT))
+	@echo "==============================================================================="
+	@echo "| 🐛 啟動後端 Debug 模式...                                             |"
+	@echo "| 📍 伺服器位址：http://localhost:$(or $(PORT),8080)                           |"
+	@echo "| 🔍 Debugger 監聽：$(DEBUG_PORT)                                                   |"
+	@echo "| 🔄 熱重載：停用（避免 debugpy 埠衝突）                                         |"
+	@echo "==============================================================================="
+	uv run --with debugpy python -m debugpy --listen $(DEBUG_PORT) --wait-for-client -m uvicorn app.api.main:app --host "$${FASTAPI_HOST:-127.0.0.1}" --port "$${FASTAPI_PORT:-$(FASTAPI_PORT)}"
 
 run-fastapi: ## 以 FastAPI 啟動 backend
 	@set -e; \

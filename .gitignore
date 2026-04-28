@@ -13,7 +13,6 @@ venv/
 env/
 
 # IDE
-.vscode/
 .idea/
 
 # Node / Next.js
