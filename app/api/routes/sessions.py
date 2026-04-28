@@ -16,18 +16,27 @@ _logger = logging.getLogger(__name__)
 
 
 def _get_session_service(request: Request) -> SessionService:
+    """
+    從相依性注入容器中獲取 Session 管理服務。
+    """
     return get_container(request).sessions
 
 
 def _check_app_name(app_name: str, request: Request) -> bool:
+    """
+    驗證請求中的應用名稱是否與配置相符。
+    """
     return app_name == get_container(request).config.app_name
 
 
-# ─── List sessions ────────────────────────────────────────────────────────────
+# ─── 列出會話 ────────────────────────────────────────────────────────────
 
 
 @router.get("/apps/{app_name}/users/{user_id}/sessions")
 async def list_sessions(app_name: str, user_id: str, request: Request):
+    """
+    列出特定使用者在特定應用下的所有對話會話。
+    """
     if not _check_app_name(app_name, request):
         return JSONResponse(status_code=404, content={"error": "app not found"})
     try:
@@ -38,7 +47,7 @@ async def list_sessions(app_name: str, user_id: str, request: Request):
         return {"sessions": []}
 
 
-# ─── Create session ───────────────────────────────────────────────────────────
+# ─── 建立會話 ───────────────────────────────────────────────────────────
 
 
 @router.post("/apps/{app_name}/users/{user_id}/sessions")
@@ -48,12 +57,17 @@ async def create_session(
     payload: SessionCreateRequest,
     request: Request,
 ):
+    """
+    為特定使用者建立新的對話會話。
+    如果未提供 sessionId，則會自動生成一個 UUID。
+    """
     if not _check_app_name(app_name, request):
         return JSONResponse(status_code=404, content={"error": "app not found"})
 
     session_id = (payload.sessionId or "").strip() or str(uuid.uuid4())
 
     try:
+        # 確保會話存在於儲存中，並可選地初始化狀態
         await _get_session_service(request).ensure_session(
             session_id, payload.state, user_id=user_id
         )
@@ -65,7 +79,7 @@ async def create_session(
         )
 
 
-# ─── Get session ──────────────────────────────────────────────────────────────
+# ─── 獲取會話詳情 ──────────────────────────────────────────────────────────────
 
 
 @router.get("/apps/{app_name}/users/{user_id}/sessions/{session_id}")
@@ -75,6 +89,9 @@ async def get_session(
     session_id: str,
     request: Request,
 ):
+    """
+    獲取指定會話的詳細資訊。
+    """
     if not _check_app_name(app_name, request):
         return JSONResponse(status_code=404, content={"error": "app not found"})
 
@@ -86,7 +103,7 @@ async def get_session(
     return session_data
 
 
-# ─── Delete session ───────────────────────────────────────────────────────────
+# ─── 刪除會話 ───────────────────────────────────────────────────────────
 
 
 @router.delete("/apps/{app_name}/users/{user_id}/sessions/{session_id}")
@@ -96,6 +113,9 @@ async def delete_session(
     session_id: str,
     request: Request,
 ):
+    """
+    刪除指定的對話會話。
+    """
     if not _check_app_name(app_name, request):
         return JSONResponse(status_code=404, content={"error": "app not found"})
 
