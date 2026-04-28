@@ -30,7 +30,12 @@
 
 ### 系統架構圖
 
-![arch](archi.png)
+![arch](docs/archi.png)
+
+---
+### 功能設計圖
+
+![features](docs/features.png)
 
 ### 後端架構摘要
 
